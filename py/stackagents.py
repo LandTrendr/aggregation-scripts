@@ -22,6 +22,8 @@ from gdalconst import *
 import numpy as np
 from tempfile import mkstemp
 from validation_funs import *
+from datetime import datetime
+import getpass
 
 SCRIPT_LAST_UPDATED = "08/10/2015"
 
