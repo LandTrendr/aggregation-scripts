@@ -9,9 +9,8 @@ Inputs:
     - modelregion
     - outputfile path
 Outputs:
-    -  ENVI image stack (.bsq file type) w/ 1 band per year 
-       identifying dominant change agents
-    -  meta data file
+    -  ENVI image stack (.bsq file type) w/ 1 band per year identifying dominant change agents
+    -  metadata file
 
 Usage: python stackagents.py [modelregion] [outputfile]
 Example: python stackagents.py mr224 /projectnb/trenders/proj/aggregation/aggregation-git/outputs/mr224/mr224_agent_aggregation.bsq
@@ -22,10 +21,6 @@ from gdalconst import *
 import numpy as np
 from tempfile import mkstemp
 from validation_funs import *
-from datetime import datetime
-import getpass
-
-SCRIPT_LAST_UPDATED = "08/10/2015"
 
 AGGREGATION_GIT_PATH = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 AGGREGATION_PATH = os.path.dirname(AGGREGATION_GIT_PATH)
@@ -62,8 +57,8 @@ def getPriorities(modelregion):
 
     return priorities
 
-
 def getUASize(path):
+    '''Extract bounding info & projection, driver, transform from usearea map'''
 
     #open and get bounding information from the cloudmask
     UA_image=gdal.Open(path, GA_ReadOnly)
@@ -110,6 +105,7 @@ def getUASize(path):
 
 
 def aggregate(image, agentDict, masterSize, bn):
+    '''apply priorities to assign a change agent to each pixel in scene'''
 
     for agentID in sorted(agentDict.keys()):
        
@@ -238,37 +234,11 @@ def edithdr(path, start):
     os.remove(hdrPath)
     shutil.move(tmpPath, hdrPath)
 
-def createMetadata_tile(outpath_git, outpath_bigdata, agents, scene):
-  
-    timeStamp = datetime.now().strftime('%Y%m%d %H:%M:%S')
-    user = getpass.getuser()
-    commandline = " ".join(sys.argv)
+def metaDescription(agents, scene):
     desc = "This is an yearly image stack of dominant land cover change agents for TSA {0} aggregated from the following sources:".format(scene)
-    desc2 = "\n-".join(agents)
+    desc2 = "\n -" + "\n -".join(agents.values()) 
 
-    outpath_git_meta = os.path.splitext(outpath_git)[0] + "_meta.txt"
-    outpath_bigdata_meta = os.path.splitext(outpath_bigdata)[0] + "_meta.txt"
-
-    f = open(outpath_git_meta, "w")
-    f.write(desc + desc2)
-    f.write("\nFULL IMAGE PATH: " + outpath_bigdata)
-    f.write("\nCREATED BY: " + os.path.realpath(__file__))
-    f.write("\nSCRIPT LAST UPDATED: " + SCRIPT_LAST_UPDATED)
-    f.write("\nCOMMAND: " + commandline)
-    f.write("\nTIME: " + timeStamp)
-    f.write("\nUSER: " + user)
-    f.close()
-
-    f = open(outpath_bigdata_meta, "w")
-    f.write(desc + desc2)
-    f.write("\nFULL IMAGE PATH: " + outpath_bigdata)
-    f.write("\nCREATED BY: " + os.path.realpath(__file__))
-    f.write("\nSCRIPT LAST UPDATED: " + SCRIPT_LAST_UPDATED)
-    f.write("\nCOMMAND: " + commandline)
-    f.write("\nTIME: " + timeStamp)
-    f.write("\nUSER: " + user)
-    f.close()
-
+    return desc + desc2
 
 def main(modelregion, outputfile):
 
@@ -293,11 +263,10 @@ def main(modelregion, outputfile):
         
         bigdatadir = os.path.join(AGGREGATION_PATH, "big_data")
         relpath = os.path.relpath(outputfile, AGGREGATION_GIT_PATH)
-        outdir_bigdata = os.path.join(os.path.dirname(os.path.join(bigdatadir, relpath)), "tiles")
-        outdir_git = os.path.join(os.path.dirname(outputfile), "tiles")
+        outdir_bigdata = os.path.join(os.path.dirname(os.path.join(bigdatadir, relpath)), "agent_tiles")
+        outdir_git = os.path.join(os.path.dirname(outputfile), "agent_tiles")
         outname = '{0}_agent_aggregation.bsq'.format(scene)
-        outpath_bigdata = os.path.join(outdir_bigdata, outname)
-        outpath_git = os.path.join(outdir_git, outname)
+        outpath = os.path.join(outdir_bigdata, outname)
         for d in [outdir_bigdata, outdir_git]:
             if not os.path.exists(d):
                 os.makedirs(d)
@@ -318,14 +287,19 @@ def main(modelregion, outputfile):
             agImage = aggregate(agImage, agents, UASizeDict, band)
 
             print 'Writing band {0}'.format(band)
-            writeFile(outpath_bigdata, agImage, outfileDict, UASizeDict, band, bands)
+            writeFile(outpath, agImage, outfileDict, UASizeDict, band, bands)
         
         
-        edithdr(outpath_bigdata, 1984)
-        print 'Created {0}'.format(outpath_bigdata)
-        if os.path.exists(outpath_bigdata):
-            tiles.append(outpath_bigdata)
-        createMetadata_tile(outpath_git, outpath_bigdata, agents, scene)
+        edithdr(outpath, 1984)
+        print 'Created {0}'.format(outpath)
+        if os.path.exists(outpath):
+            tiles.append(outpath)
+
+        #create metadata
+        dataDesc = metaDescription(agents, scene)
+        lastCommit = getLastCommit(os.path.abspath(__file__))
+        createMetadata(sys.argv, outpath, description=dataDesc, lastCommit=lastCommit) #bigData dir
+        createMetadata(sys.argv, outpath, altMetaDir=outdir_git, description=dataDesc, lastCommit=lastCommit) #git dir
 
     #mosaicTiles(tiles)
 
