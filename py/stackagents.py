@@ -21,7 +21,10 @@ from gdalconst import *
 import numpy as np
 from tempfile import mkstemp
 from validation_funs import *
+import mosaic
+import clipRaster
 
+LAST_COMMIT = getLastCommit(os.path.abspath(__file__))
 AGGREGATION_SCRIPTS_PATH = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 AGGREGATION_PARAMETERS_PATH = os.path.join(AGGREGATION_SCRIPTS_PATH, "parameters")
 AGGREGATION_PATH = os.path.dirname(AGGREGATION_SCRIPTS_PATH)
@@ -235,7 +238,7 @@ def edithdr(path, start):
     os.remove(hdrPath)
     shutil.move(tmpPath, hdrPath)
 
-def metaDescription(agents, scene):
+def metaDescription_tiles(agents, scene):
     desc = "This is an yearly image stack of dominant land cover change agents for TSA {0} aggregated from the following sources:".format(scene)
     desc2 = "\n -" + "\n -".join(agents.values()) 
 
@@ -249,7 +252,7 @@ def main(modelregion, outputfile):
     scenes = getScenes(modelregion.lower())
 
     if os.path.exists(outputfile):
-        print "\n" + outputfile " already exists. Replacing ALL outputs."
+        print "\n" + outputfile + " already exists. Replacing ALL outputs."
         replace = True
     else:
         replace = False
@@ -303,34 +306,37 @@ def main(modelregion, outputfile):
                 tiles.append(outpath)
 
             #create metadata
-            dataDesc = metaDescription(agents, scene)
-            lastCommit = getLastCommit(os.path.abspath(__file__))
-            createMetadata(sys.argv, outpath, description=dataDesc, lastCommit=lastCommit)
+            dataDesc = metaDescription_tiles(agents, scene)
+            createMetadata(sys.argv, outpath, description=dataDesc, lastCommit=LAST_COMMIT)
 
         else:
             print "\n" + outpath + " already exists. Moving on..."
+            tiles.append(outpath)
 
     #mosaic tiles
-    #create list of tiles to mosaic
-    tileListFile = os.path.splitext(os.path.abspath(outputfile))[0] + "_mosaicfilelist.txt"
-    f = open(tileListFile, 'w')
-    f.write("Mosaicking agent aggregation tile for " + modelregion + "\n")
-    for i in tiles:
-        f.write(i + "\n")
-    f.close()
-
-    #call mosaic.py script
     mosaicfile = os.path.splitext(os.path.abspath(outputfile))[0] + "_nonclipped.bsq"
     if (not os.path.exists(mosaicfile)) or replace:
-        mosaic_cmd = "mosaic.py {0} {1} --meta='mosaicked within stackagents.py script'".format(tileListFile, outputfile)
-        subprocess.call(mosaic_cmd, shell=True)
+        print "\nMosaicking scenes..."
+        mosaic.createMosaicGDALMERGE(tiles, mosaicfile, None, "0")
+        metaDesc_mosaic = "This is a mosaic of the following agent aggregation maps: \n -" + "\n -".join(tiles)
+        
     else:
         print "\n" + mosaicfile + " already exists. Moving on..."
 
     #clip to model region
-    modelRegionShp = "/projectnb/trenders/general_files/datasets/spatial_data/modelregions/cmonmodreg.shp"
-    clip_cmd = "clipRaster.py " + mosaicfile + " " + modelRegionShp + " " + os.path.abspath(outputfile) + "--field=MR --attr=224"
-    subprocess.call(clip_cmd, shell=True)
+    while not os.path.exists(mosaicfile):
+        pass
+    else:
+        createMetadata(sys.argv, mosaicfile, description=metaDesc_mosaic, lastCommit=LAST_COMMIT)
+        modelRegionShp = "/projectnb/trenders/general_files/datasets/spatial_data/modelregions/cmonmodreg.shp"
+        modelnum = modelregion.lower().replace("mr", "")
+        print "\nClipping mosaic to model region..."
+        clipRaster.main(mosaicfile, modelRegionShp, os.path.abspath(outputfile), 1, 0, "MR", ["224"])
+        metaDesc_clip = "This is an agent aggregation map clipped to " + modelregion + ",\n using boundaries: " + modelRegionShp + "\n from map: " + mosaicfile
+        createMetadata(sys.argv, os.path.abspath(outputfile), description=metaDesc_clip, lastCommit=LAST_COMMIT)
+
+    if os.path.exists(outputfile):
+        print " DONE!"
 
 
 if __name__ == '__main__':
