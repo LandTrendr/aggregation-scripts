@@ -13,23 +13,24 @@ Outputs:
     -  metadata file
 
 Usage: python stackagents.py [modelregion] [outputfile]
-Example: python stackagents.py mr224 /projectnb/trenders/proj/aggregation/aggregation-git/outputs/mr224/mr224_agent_aggregation.bsq
+Example: python stackagents.py mr224 /projectnb/trenders/proj/aggregation/outputs/mr224/mr224_agent_aggregation.bsq
 '''
-import sys, os, glob, re, shutil
+import sys, os, glob, re, shutil, subprocess
 from osgeo import ogr, gdal, gdalconst
 from gdalconst import *
 import numpy as np
 from tempfile import mkstemp
 from validation_funs import *
 
-AGGREGATION_GIT_PATH = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-AGGREGATION_PATH = os.path.dirname(AGGREGATION_GIT_PATH)
+AGGREGATION_SCRIPTS_PATH = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+AGGREGATION_PARAMETERS_PATH = os.path.join(AGGREGATION_SCRIPTS_PATH, "parameters")
+AGGREGATION_PATH = os.path.dirname(AGGREGATION_SCRIPTS_PATH)
 
 def getScenes(modelregion):
     '''Reads "tsa_list.txt" parameter file for specified modelregion.
     Returns a list of TSAs'''
 
-    paramfile = os.path.join(AGGREGATION_GIT_PATH, "data/parameters", modelregion, "tsa_list.txt")
+    paramfile = os.path.join(AGGREGATION_PARAMETERS_PATH, modelregion, "tsa_list.txt")
     paramdata = open(paramfile, 'r')
 
     tsas = []
@@ -45,7 +46,7 @@ def getPriorities(modelregion):
     '''Reads "agent_source_priorities.txt" parameter file for specified modelregion. 
     Returns a dictionaries of agent source priorities.'''
 
-    paramfile = os.path.join(AGGREGATION_GIT_PATH, "data/parameters", modelregion, "agent_source_priorities.txt")
+    paramfile = os.path.join(AGGREGATION_PARAMETERS_PATH, modelregion, "agent_source_priorities.txt")
     paramdata = open(paramfile, 'r')
 
     priorities = {}
@@ -247,6 +248,12 @@ def main(modelregion, outputfile):
     agents = getPriorities(modelregion.lower())
     scenes = getScenes(modelregion.lower())
 
+    if os.path.exists(outputfile):
+        print "\n" + outputfile " already exists. Replacing ALL outputs."
+        replace = True
+    else:
+        replace = False
+
     tiles = []
     for scene in scenes:
 
@@ -261,48 +268,69 @@ def main(modelregion, outputfile):
 
         UAPath = '/projectnb/trenders/scenes/gnn_snapped_cmon_usearea_files/{0}_usearea.bsq'.format(scene)
         
-        bigdatadir = os.path.join(AGGREGATION_PATH, "big_data")
-        relpath = os.path.relpath(outputfile, AGGREGATION_GIT_PATH)
-        outdir_bigdata = os.path.join(os.path.dirname(os.path.join(bigdatadir, relpath)), "agent_tiles")
-        outdir_git = os.path.join(os.path.dirname(outputfile), "agent_tiles")
+        outputsdir = os.path.join(AGGREGATION_PATH, "outputs")
+        relpath = os.path.relpath(os.path.abspath(outputfile), AGGREGATION_SCRIPTS_PATH)
+        outdir = os.path.join(os.path.dirname(os.path.join(outputsdir, relpath)), "agent_tiles")
         outname = '{0}_agent_aggregation.bsq'.format(scene)
-        outpath = os.path.join(outdir_bigdata, outname)
-        for d in [outdir_bigdata, outdir_git]:
-            if not os.path.exists(d):
-                os.makedirs(d)
+        outpath = os.path.abspath(os.path.join(outdir, outname))
+        if not os.path.exists(outdir):
+            os.makedirs(outdir)
+
+        if (not os.path.exists(outpath)) or replace:
         
-        UASizeDict, outfileDict = getUASize(UAPath)
+            UASizeDict, outfileDict = getUASize(UAPath)
 
-        #Open sample iamge to get Band Count
-        sample = gdal.Open(agents[1], GA_ReadOnly)
-        bands = sample.RasterCount
-        sample = None
+            #Open sample iamge to get Band Count
+            sample = gdal.Open(agents[1], GA_ReadOnly)
+            bands = sample.RasterCount
+            sample = None
 
-        for b in range(bands):
+            for b in range(bands):
 
-            band = b + 1
+                band = b + 1
 
-            #Set up aggregate image array
-            agImage = np.zeros((UASizeDict['masterYsize'], UASizeDict['masterXsize']))
-            agImage = aggregate(agImage, agents, UASizeDict, band)
+                #Set up aggregate image array
+                agImage = np.zeros((UASizeDict['masterYsize'], UASizeDict['masterXsize']))
+                agImage = aggregate(agImage, agents, UASizeDict, band)
 
-            print 'Writing band {0}'.format(band)
-            writeFile(outpath, agImage, outfileDict, UASizeDict, band, bands)
-        
-        
-        edithdr(outpath, 1984)
-        print 'Created {0}'.format(outpath)
-        if os.path.exists(outpath):
-            tiles.append(outpath)
+                print 'Writing band {0}'.format(band)
+                writeFile(outpath, agImage, outfileDict, UASizeDict, band, bands)
+            
+            
+            edithdr(outpath, 1984)
+            print 'Created {0}'.format(outpath)
+            if os.path.exists(outpath):
+                tiles.append(outpath)
 
-        #create metadata
-        dataDesc = metaDescription(agents, scene)
-        lastCommit = getLastCommit(os.path.abspath(__file__))
-        createMetadata(sys.argv, outpath, description=dataDesc, lastCommit=lastCommit) #bigData dir
-        createMetadata(sys.argv, outpath, altMetaDir=outdir_git, description=dataDesc, lastCommit=lastCommit) #git dir
+            #create metadata
+            dataDesc = metaDescription(agents, scene)
+            lastCommit = getLastCommit(os.path.abspath(__file__))
+            createMetadata(sys.argv, outpath, description=dataDesc, lastCommit=lastCommit)
 
-    #mosaicTiles(tiles)
+        else:
+            print "\n" + outpath + " already exists. Moving on..."
 
+    #mosaic tiles
+    #create list of tiles to mosaic
+    tileListFile = os.path.splitext(os.path.abspath(outputfile))[0] + "_mosaicfilelist.txt"
+    f = open(tileListFile, 'w')
+    f.write("Mosaicking agent aggregation tile for " + modelregion + "\n")
+    for i in tiles:
+        f.write(i + "\n")
+    f.close()
+
+    #call mosaic.py script
+    mosaicfile = os.path.splitext(os.path.abspath(outputfile))[0] + "_nonclipped.bsq"
+    if (not os.path.exists(mosaicfile)) or replace:
+        mosaic_cmd = "mosaic.py {0} {1} --meta='mosaicked within stackagents.py script'".format(tileListFile, outputfile)
+        subprocess.call(mosaic_cmd, shell=True)
+    else:
+        print "\n" + mosaicfile + " already exists. Moving on..."
+
+    #clip to model region
+    modelRegionShp = "/projectnb/trenders/general_files/datasets/spatial_data/modelregions/cmonmodreg.shp"
+    clip_cmd = "clipRaster.py " + mosaicfile + " " + modelRegionShp + " " + os.path.abspath(outputfile) + "--field=MR --attr=224"
+    subprocess.call(clip_cmd, shell=True)
 
 
 if __name__ == '__main__':
