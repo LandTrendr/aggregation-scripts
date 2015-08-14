@@ -14,7 +14,7 @@ This script creates raster stacks of yearly change in biomass values. Biomass da
 >Usage: python deltaBiomass.py [path/to/parameterfile]
 
 Example Parameter File:
-'''
+```
 MR224 Post Tassel Cap Biomass Params
 region: mr224
 name: delta_tc_nbr_k1_bph_ge_3
@@ -25,4 +25,4 @@ biomass:/projectnb/trenders/proj/cmonster/mr224/biomassApril2014/nbr/tc_nbr_k1/b
 biomass:/projectnb/trenders/proj/cmonster/mr224/biomassApril2014/nbr/tc_nbr_k1/bph_ge_3_crm
 biomass:/projectnb/trenders/proj/cmonster/mr224/biomassApril2014/nbr/tc_nbr_k1/bph_ge_3_jenk
 biomass:/projectnb/trenders/proj/cmonster/mr224/biomassApril2014/nbr/tc_nbr_k5/bph_ge_3
-'''
+```
