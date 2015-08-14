@@ -16,7 +16,9 @@ This script creates raster stacks of yearly change in biomass values. Biomass da
 Example Parameter File:
 '''
 MR224 Post Tassel Cap Biomass Params
+
 region: mr224
+
 name: delta_tc_nbr_k1_bph_ge_3
 name: delta_tc_nbr_k1_bph_ge_3_crm
 name: delta_tc_nbr_k1_bph_ge_3_jenk
