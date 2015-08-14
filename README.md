@@ -1,5 +1,5 @@
 This is a set of scripts to summarize biomass and change agent data.
-----------------------------------------------------------------------
+____________________________________________________________________
 
 **stackagents.py**
 This script loops through a prioritized list of change agent maps (located in parameters folder) and combines these sources into a yearly raster stack. 
