@@ -1,4 +1,4 @@
-#This is a set of scripts to summarize biomass and change agent data#
+This is a set of scripts to summarize biomass and change agent data.
 ----------------------------------------------------------------------
 
 **stackagents.py**
