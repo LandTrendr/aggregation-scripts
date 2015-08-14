@@ -5,7 +5,7 @@ This script loops through a prioritized list of change agent maps (located in pa
 
 >Usage: python stackagents.py [modelregion] [outputfile]
 
->Example: python stackagents.py mr224 /projectnb/trenders/proj/aggregation/outputs/mr224/change_agent_maps/mr224_agent_aggregation.bsq*
+>Example: python stackagents.py mr224 /projectnb/trenders/proj/aggregation/outputs/mr224/change_agent_maps/mr224_agent_aggregation.bsq
 
 
 
