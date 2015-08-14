@@ -315,11 +315,10 @@ def main(modelregion, outputfile):
 
     #mosaic tiles
     mosaicfile = os.path.splitext(os.path.abspath(outputfile))[0] + "_nonclipped.bsq"
+    metaDesc_mosaic = "This is a mosaic of the following agent aggregation maps: \n -" + "\n -".join(tiles)
     if (not os.path.exists(mosaicfile)) or replace:
         print "\nMosaicking scenes..."
         mosaic.createMosaicGDALMERGE(tiles, mosaicfile, None, "0")
-        metaDesc_mosaic = "This is a mosaic of the following agent aggregation maps: \n -" + "\n -".join(tiles)
-        
     else:
         print "\n" + mosaicfile + " already exists. Moving on..."
 

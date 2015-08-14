@@ -3,7 +3,7 @@ deltaBiomass.py
 Creates yearly delta biomass image stacks for specified biomass flavors.
 Outputs from this script can be used to integrate with change agent aggregation layers.
 
-Authors: Tara Larrue (tlarrue2991@gmail.com) & Jamie Perkins
+Author: Jamie Perkins
 
 Inputs: 
     - yearly biomass images
@@ -11,8 +11,8 @@ Outputs:
     -  ENVI image stack (.bsq file type) of yearly delta biomass images
     -  metadata file
 
-Usage: python stackagents.py [modelregion] [outputfile]
-Example: python deltaBiomass.py mr224 /projectnb/trenders/proj/aggregation/outputs/mr224/mr224_agent_aggregation.bsq
+Usage: python deltaBiomass.py [path/to/parameterfile]
+Example: python deltaBiomass.py /projectnb/trenders/proj/aggregation/log/mr224_deltabiomass_params.txt
 '''
 import sys, os, glob, re, shutil
 from osgeo import ogr, gdal, gdalconst
