@@ -18,7 +18,7 @@ Example: python summarizeBiomassByAgent mr224 jenk
 import os, sys, glob, gdal
 import numpy as np
 from validation_funs import *
-from intersectMask import *
+import intersectMask as im
 
 LAST_COMMIT = getLastCommit(os.path.abspath(__file__))
 AGGREGATION_SCRIPTS_PATH = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -34,10 +34,7 @@ def txtToDict(txtfile):
 	dictionary = {}
 	for line in txt:
 		comps = line.split(":")
-		if int(comps[0]) == 0:
-			continue
-		else:
-			dictionary[int(comps[0])] = comps[1].strip()
+		dictionary[int(comps[0])] = comps[1].strip()
 
 	return dictionary
 
@@ -78,7 +75,7 @@ def main(modelregion, biotype):
 			print "\nWorking on map '", m, "' band ", b, " ..."
 			for c,a in agents.iteritems():
 
-				outBandArray, finalTransform, projection, driver, nodata, datatype = maskAsArray(m, agent_map, src_band=b, msk_band=biomass_to_agentband(b), msk_value=c)
+				outBandArray, finalTransform, projection, driver, nodata, datatype = im.maskAsArray(m, agent_map, src_band=b, msk_band=biomass_to_agentband(b), msk_value=c)
 				total_change = np.sum(outBandArray)
 				magnitude_change = np.sum(np.absolute(outBandArray))
 				pos = (magnitude_change+total_change)/2
@@ -95,13 +92,13 @@ def main(modelregion, biotype):
 	summary_csv.close()
 	print "\nDone extracting summary values."
 
-	#write metadata file
+	# write metadata file
 	createMetadata(sys.argv, outputfile, description="This is a summary table of delta biomass data by change agent before melt.", lastCommit=LAST_COMMIT)
 
 	#melt table w/ medians : YEAR | AGENT | deltaBio total | deltabio mag | deltabio neg | deltabio pos
 	print "\nMelting summary values for median delta biomass values...."
 	outputfile_melt = os.path.splitext(outputfile)[0] + "_median.csv"
-	sumdata = csvToArray(summary_csv)
+	sumdata = csvToArray(outputfile)
 
 	headers = ["AGENT_CODE", "AGENT", "YEAR", "DELTABIO_TOTAL", "DELTABIO_MAGNITUDE", "DELTABIO_NEGATIVE", "DELTABIO_POSITIVE"]
 	dtypes = [(i,'a32') for i in headers]
@@ -109,10 +106,13 @@ def main(modelregion, biotype):
 
 	meltdata["AGENT_CODE"] = np.repeat(agents.keys(), len(bands))
 	meltdata["AGENT"] = np.repeat(agents.values(), len(bands))
-	meltadata["YEAR"] = np.tile([i+1989 for i in bands], len(agents))
+	meltdata["YEAR"] = np.tile([i+1989 for i in bands], len(agents))
 	for ind,i in enumerate(meltdata):
-		print "\nWorking on agent: ", i["AGENT"], " and year: ", i["YEAR"], " ..."
-		rows = sumdata[(sumdata["AGENT_CODE"] == i["AGENT_CODE"]) & (sumdata["YEAR"] == i["YEAR"])]
+		agent = i["AGENT_CODE"]
+		year = i["YEAR"]
+		print "\nWorking on agent: ", agent, " and year: ", year, " ..."
+
+		rows = sumdata[(sumdata["AGENT_CODE"] == int(agent)) & (sumdata["YEAR"] == int(year))]
 		meltdata[ind]["DELTABIO_TOTAL"] = np.median(rows["DELTABIO_TOTAL"])
 		meltdata[ind]["DELTABIO_MAGNITUDE"] = np.median(rows["DELTABIO_MAGNITUDE"])
 		meltdata[ind]["DELTABIO_NEGATIVE"] = np.median(rows["DELTABIO_NEGATIVE"])

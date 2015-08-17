@@ -1,18 +1,17 @@
 ##CMonster Graphing
 
-#install.packages("ggplot2")
-#library(ggplot2)
+# install.packages("ggplot2")
+library(ggplot2)
 
 #set working directory for old data
 
-setwd("/projectnb/trenders/proj/aggregation/outputs/mr224/summary_tables/")
-data2=read.csv("all.csv", header = T)
+# setwd("/projectnb/trenders/proj/aggregation/outputs/mr224/summary_tables/")
+# data2=read.csv("all.csv", header = T)
 
 #set working directory for new data
-setwd("/projectnb/trenders/proj/aggregation/outputs/mr224/summary_tables/")
+setwd("/projectnb/trenders/proj/aggregation/outputs/mr224/summary_tables/no_noagent/")
 #data=read.csv("mr224_median_biomass_change_by_agent_year_REK.csv", header = T)
-data=read.csv("all.csv", header = T)
-
+data=read.csv("mr224_jenkins_deltabiomass_summary_median_shaped.csv", header = T)
 
 ########################
 #NOT USED#
@@ -69,7 +68,7 @@ list$Tg=list$Year.Sum/1000000000
 
 #join the yearly total change in biomass back into the original dataset
 #install.packages("plyr")
-#library(plyr)
+library(plyr)
 print("here")
 bigdf=join(df, list, type="left")
 
@@ -166,6 +165,9 @@ p<-p+theme(axis.title.x=element_text(size=rel(2)))
 p<-p+theme(axis.title.y=element_text(size=rel(2)))
 p<-p+theme(axis.text.x=element_text(angle=90, size=rel(2), vjust=0.45))
 p
+pdf("total_delta_biomass_crm.pdf")
+plot(p)
+dev.off()
 
 #####################
 #To put graphs in a new window on linux, type in x11() first; 
@@ -173,22 +175,28 @@ p
 
 
 #This makes a separate graph for each agent
-#x11()
-# z=ggplot(data=bigdf1,aes(factor(Year),Biomass/1000000,fill=Agent))+ 
-#         geom_bar(stat = "identity")+
-#         geom_bar(aes(factor(Year),Biomass/1000000,fill=Agent),bigdf2,stat = "identity",position = "identity")+
-#         facet_wrap(~Agent)+ylab("Total delta biomass(Mg)")+xlab("Year")+scale_fill_manual(values=pal)
-# z
+x11()
+z=ggplot(data=bigdf1,aes(factor(Year),Biomass/1000000,fill=Agent))+ 
+        geom_bar(stat = "identity")+
+        geom_bar(aes(factor(Year),Biomass/1000000,fill=Agent),bigdf2,stat = "identity",position = "identity")+
+        facet_wrap(~Agent)+ylab("Total delta biomass(Mg)")+xlab("Year")+scale_fill_manual(values=pal)
+z
+pdf("total_delta_biomass_plot_per_agent_crm.pdf")
+plot(z)
+dev.off()
 
 
 #####################
 #Net gain/loss by year with the individual data overlayed
-#x11()
-# q<-ggplot(list,aes(factor(Year),Year.Sum/1000000))+geom_bar(stat="identity")+xlab("Year")+ylab("Total delta biomass(Mg)")+
-#          geom_bar(aes(factor(Year),Biomass/1000000,fill=Agent,order=Agent),bigdf,stat = "identity",position = "dodge")+scale_fill_manual(values=pal)+
-#          geom_abline(intercept=0, slope=0, colour="black", size=1.75)
-# q
-# 
+x11()
+q<-ggplot(list,aes(factor(Year),Year.Sum/1000000))+geom_bar(stat="identity")+xlab("Year")+ylab("Total delta biomass(Mg)")+
+         geom_bar(aes(factor(Year),Biomass/1000000,fill=Agent,order=Agent),bigdf,stat = "identity",position = "dodge")+scale_fill_manual(values=pal)+
+         geom_abline(intercept=0, slope=0, colour="black", size=1.75)
+q
+pdf("net_gain_loss_crm.pdf")
+plot(q)
+dev.off()
+
 
 #To save a pdf, I always just close any x11 windows I have open and plot it within rstudio.  
 #Above the graph should be a button for exporting a pdf, I usually use letter size
