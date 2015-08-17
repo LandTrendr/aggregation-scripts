@@ -61,3 +61,9 @@ biomass:/projectnb/trenders/proj/cmonster/mr224/biomassApril2014/nbr/tc_nbr_k1/b
 biomass:/projectnb/trenders/proj/cmonster/mr224/biomassApril2014/nbr/tc_nbr_k1/bph_ge_3_jenk
 biomass:/projectnb/trenders/proj/cmonster/mr224/biomassApril2014/nbr/tc_nbr_k5/bph_ge_3
 ```
+**summarizeBiomassByAgent.py**
+This script creates CSV files containing yearly total change in biomass values for each change agent.
+
+>Usage: python summarizeBiomassByAgent.py [modelregion] [crm/jenk]
+
+>Example: python summarizeBiomassByAgent.py mr224 jenk
