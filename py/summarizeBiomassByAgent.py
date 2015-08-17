@@ -1,14 +1,19 @@
 '''
 summarizeBiomassByAgent.py
-inputs:
-- region
-- crm/jenkins
-- outputfile
+Creates summary CSV files containing yearly total change in biomass values for each change agent. 
 
-outputs:
-- csv with median biomass diff per year
+Author: Tara Larrue (tlarrue2991@gmail.com)
 
-AGENT CODE | AGENT NAME | BAND5_K1_1991
+Inputs:
+	- model region
+	- crm/jenkins
+
+Outputs:
+	- csv with biomass diff per year by change agent for every biomass biomass source 
+	- csv with median biomass diff per year by change agent
+
+Usage: python summarizeBiomassByAgent.py [modelregion] [crm/jenk]
+Example: python summarizeBiomassByAgent mr224 jenk
 '''
 import os, sys, glob, gdal
 import numpy as np
