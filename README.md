@@ -10,34 +10,26 @@ This script loops through a prioritized list of change agent maps (located in pa
 
 Change Agent Output Key:
 ```
+0: No Agent
 1: Clearcut
 2: Partial Harvest
 3: Development
 4: Fire
-5: Salvage
 6: Insect/Disease
 7: Road
-8: No Visible Change
 9: False Change
 10: Unknown Agent
 11: Water
-12: Wind
-13: Avalanche: chute
-14: Avalanche: runout
-15: Debris flow
-16: Landslide
+15: Debris Flow
 17: Other
-
-21: MPB - 29
-22: MPB - 239
-
-25: WSB - 29
-50: mr224 wetness longest recovery2, unfiltered
-
-26: WSB - 239
-
-30: mr224 longest disturbance, unfiltered
-40: mr224 greatest fast disturbance, unfiltered
+18: No Name
+21: MPB-29
+22: MPB-239
+25: WSB-29
+26: WSB-239
+30: Longest Disturbance
+40: Greatest Disturbance
+51: Growth
 ```
 
 
