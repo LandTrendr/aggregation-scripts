@@ -9,9 +9,9 @@ library(ggplot2)
 # data2=read.csv("all.csv", header = T)
 
 #set working directory for new data
-setwd("/projectnb/trenders/proj/aggregation/outputs/mr224/summary_tables/no_noagent/")
+setwd("/projectnb/trenders/proj/aggregation/outputs/mr224/summary_tables/")
 #data=read.csv("mr224_median_biomass_change_by_agent_year_REK.csv", header = T)
-data=read.csv("mr224_jenkins_deltabiomass_summary_median_shaped.csv", header = T)
+data=read.csv("mr224_crm_deltabiomass_summary_median_shaped.csv", header = T)
 
 ########################
 #NOT USED#
@@ -150,7 +150,7 @@ pal[19]=insectcolor #wsb-29
 
 
 #####ACTUAL PLOTTING CODE!!!#########
-
+setwd("/projectnb/trenders/proj/aggregation/figs/")
       p<-ggplot()+
            geom_bar(aes(factor(Year), Biomass/1000000000,fill=Agent, order=Agent),bigdf1, stat = "identity", position = "stack")+
            geom_bar(aes(factor(Year), Biomass/1000000000,fill=Agent, order=Agent),bigdf2, stat = "identity", position = "stack")+
