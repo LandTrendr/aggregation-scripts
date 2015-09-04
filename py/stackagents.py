@@ -27,7 +27,7 @@ LAST_COMMIT = getLastCommit(os.path.abspath(__file__))
 AGGREGATION_SCRIPTS_PATH = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 AGGREGATION_PARAMETERS_PATH = os.path.join(AGGREGATION_SCRIPTS_PATH, "parameters")
 AGGREGATION_PATH = os.path.dirname(AGGREGATION_SCRIPTS_PATH)
-MR224_MASK_PATH = "/projectnb/trenders/proj/cmonster/mr224/mr224_extent_mask_centered.bsq"
+MR224_MASK_PATH = "/projectnb/trenders/proj/cmonster/mr224/mr224_extent_mask.bsq"
 
 def getScenes(modelregion):
 	'''Reads "tsa_list.txt" parameter file for specified modelregion.

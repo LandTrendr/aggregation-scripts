@@ -11,7 +11,7 @@ library(ggplot2)
 #set working directory for new data
 setwd("/projectnb/trenders/proj/aggregation/outputs/mr224/summary_tables/")
 #data=read.csv("mr224_median_biomass_change_by_agent_year_REK.csv", header = T)
-data=read.csv("mr224_mr224_deltabiomass_summary_median_shaped.csv", header = T)
+data=read.csv("mr224_agent_hectares_summary.csv", header = T)
 
 ########################
 #NOT USED#
@@ -51,11 +51,12 @@ new=new[!is.na(new[,4]),]
 #rename the dataframe
 df=new
 #rename the columns
+colnames(df)[2]<-"Agent"
 colnames(df)[3]<-"Year"
-colnames(df)[4]<-"Biomass"
+colnames(df)[4]<-"Area"
 
 #Create a separate dataset summing the yearly change in biomass from all agents
-test=by(df$Biomass, df$Year,sum)
+test=by(df$Area, df$Year,sum)
 list=as.data.frame(cbind(c(test)))
 Year=row.names(list)
 list$Year<-Year
@@ -64,7 +65,7 @@ colnames(list)[1]="Year.Sum"
 #check the values in Tg.  Joe's new numbers are kg straight up. 
 #  these are the total change for each year
 
-list$Tg=list$Year.Sum/1000000000
+# list$Tg=list$Year.Sum/1000000000
 
 #join the yearly total change in biomass back into the original dataset
 #install.packages("plyr")
@@ -74,27 +75,36 @@ bigdf=join(df, list, type="left")
 
 print("there")
 
+
 #Change the draw order for coloring and stacking
 #Order the Agents the way you want them to be stacked for graphing
 # these names need to match with what's in your CSV file, or else you'll get an NA
-
-bigdf$Agent<-factor(bigdf$Agent, levels=c("Fire","No Agent", "Growth", "Clearcut", "Development", "Partial Harvest",
+print(bigdf$Agent)
+# bigdf$Agent<-factor(bigdf$Agent, levels=c("Fire","No Agent", "Growth", "Clearcut", "Development", "Partial Harvest",
+#                                           "Insect/Disease", "Greatest Disturbance", "Road", "False Change", "Unknown Agent", "Water", 
+#                                           "Debris Flow", "Other", "MPB-29", "MPB-239", "WSB-29", "WSB-239", 
+#                                           "Longest Disturbance"))
+bigdf$Agent<-factor(bigdf$Agent, levels=c("Fire", "Growth", "Clearcut", "Development", "Partial Harvest",
                                           "Insect/Disease", "Greatest Disturbance", "Road", "False Change", "Unknown Agent", "Water", 
                                           "Debris Flow", "Other", "MPB-29", "MPB-239", "WSB-29", "WSB-239", 
                                           "Longest Disturbance"))
 
 #have to split into two datasets; one for positive and one for negative values to make bars stack properly
-bigdf1<-subset(bigdf,Biomass >=0)
-bigdf2<-subset(bigdf,Biomass < 0)
+# bigdf1<-subset(bigdf,Biomass >=0)
+# bigdf2<-subset(bigdf,Biomass < 0)
 
-
+print(bigdf)
 
 #Creates a list that will be ordered alphabetically, so that the colors can be matched accordingly, shouldn't ever need to change
 # order=cbind(sort(c("Fire","No Agent", "Growth", "Clearcut", "Development", "Partial Harvest",
 #                    "Insect/Disease", "Greatest Disturbance", "Road", "False Change", "Unknown Agent", "Water", 
 #                    "Debris Flow", "Other", "MPB-29", "MPB-239", "WSB-29", "WSB-239", 
 #                    "Longest Disturbance")))
-order=cbind(c("Fire","No Agent", "Growth", "Clearcut", "Development", "Partial Harvest",
+# order=cbind(c("Fire","No Agent", "Growth", "Clearcut", "Development", "Partial Harvest",
+#                    "Insect/Disease", "Greatest Disturbance", "Road", "False Change", "Unknown Agent", "Water", 
+#                    "Debris Flow", "Other", "MPB-29", "MPB-239", "WSB-29", "WSB-239", 
+#                    "Longest Disturbance"))
+order=cbind(c("Fire", "Growth", "Clearcut", "Development", "Partial Harvest",
                    "Insect/Disease", "Greatest Disturbance", "Road", "False Change", "Unknown Agent", "Water", 
                    "Debris Flow", "Other", "MPB-29", "MPB-239", "WSB-29", "WSB-239", 
                    "Longest Disturbance"))
@@ -152,12 +162,12 @@ pal[19]=insectcolor #wsb-29
 #####ACTUAL PLOTTING CODE!!!#########
 setwd("/projectnb/trenders/proj/aggregation/figs/")
       p<-ggplot()+
-           geom_bar(aes(factor(Year), Biomass/1000000000,fill=Agent, order=Agent),bigdf1, stat = "identity", position = "stack")+
-           geom_bar(aes(factor(Year), Biomass/1000000000,fill=Agent, order=Agent),bigdf2, stat = "identity", position = "stack")+
+           geom_bar(aes(factor(Year), Area, fill=Agent, order=Agent), bigdf, stat = "identity", position = "stack")+
+           # geom_bar(aes(factor(Year), Biomass/1000000000,fill=Agent, order=Agent),bigdf2, stat = "identity", position = "stack")+
            #geom_bar(aes(factor(Year), Year.Sum/1000000000,alpha=0.), data=list, stat = "identity", position = "identity",fill="black", colour="black") +
            #geom_bar(aes(factor(Year), Year.Sum/1000000000), data=list, stat="identity", position="identity", solid=FALSE)+ 
           #ylab("Total delta biomass(Mg)")+xlab("Year")+geom_abline(intercept=0, slope=0, colour="black", size=1)+scale_fill_manual(values=col.scheme)
-           ylab("Total delta biomass(Tg)")+
+           ylab("Total Area (Ha)")+
           xlab("Year")+
           geom_abline(intercept=0, slope=0, colour="black", size=1)+
           scale_fill_manual(values=pal)
@@ -165,37 +175,37 @@ p<-p+theme(axis.title.x=element_text(size=rel(2)))
 p<-p+theme(axis.title.y=element_text(size=rel(2)))
 p<-p+theme(axis.text.x=element_text(angle=90, size=rel(2), vjust=0.45))
 p
-pdf("mr224_mr224_deltabiomass_totalsum_barchart.pdf")
+pdf("mr224_area_barchart.pdf")
 plot(p)
 dev.off()
 
 #####################
-#To put graphs in a new window on linux, type in x11() first; 
-#all plots will go to this window until you either close it or call a second window from x11()
+# #To put graphs in a new window on linux, type in x11() first; 
+# #all plots will go to this window until you either close it or call a second window from x11()
 
 
-#This makes a separate graph for each agent
-x11()
-z=ggplot(data=bigdf1,aes(factor(Year),Biomass/1000000,fill=Agent))+ 
-        geom_bar(stat = "identity")+
-        geom_bar(aes(factor(Year),Biomass/1000000,fill=Agent),bigdf2,stat = "identity",position = "identity")+
-        facet_wrap(~Agent)+ylab("Total delta biomass(Mg)")+xlab("Year")+scale_fill_manual(values=pal)
-z
-pdf("mr224_mr224_deltabiomass_totalsum_plotperagent_barchart.pdf")
-plot(z)
-dev.off()
+# #This makes a separate graph for each agent
+# x11()
+# z=ggplot(data=bigdf1,aes(factor(Year),Biomass/1000000,fill=Agent))+ 
+#         geom_bar(stat = "identity")+
+#         geom_bar(aes(factor(Year),Biomass/1000000,fill=Agent),bigdf2,stat = "identity",position = "identity")+
+#         facet_wrap(~Agent)+ylab("Total delta biomass(Mg)")+xlab("Year")+scale_fill_manual(values=pal)
+# z
+# pdf("mr224_combined_deltabiomass_totalsum_plotperagent_barchart.pdf")
+# plot(z)
+# dev.off()
 
 
-#####################
-#Net gain/loss by year with the individual data overlayed
-x11()
-q<-ggplot(list,aes(factor(Year),Year.Sum/1000000))+geom_bar(stat="identity")+xlab("Year")+ylab("Total delta biomass(Mg)")+
-         geom_bar(aes(factor(Year),Biomass/1000000,fill=Agent,order=Agent),bigdf,stat = "identity",position = "dodge")+scale_fill_manual(values=pal)+
-         geom_abline(intercept=0, slope=0, colour="black", size=1.75)
-q
-pdf("mr224_mr224_deltabiomass_netgainloss.pdf")
-plot(q)
-dev.off()
+# #####################
+# #Net gain/loss by year with the individual data overlayed
+# x11()
+# q<-ggplot(list,aes(factor(Year),Year.Sum/1000000))+geom_bar(stat="identity")+xlab("Year")+ylab("Total delta biomass(Mg)")+
+#          geom_bar(aes(factor(Year),Biomass/1000000,fill=Agent,order=Agent),bigdf,stat = "identity",position = "dodge")+scale_fill_manual(values=pal)+
+#          geom_abline(intercept=0, slope=0, colour="black", size=1.75)
+# q
+# pdf("mr224_combined_deltabiomass_netgainloss.pdf")
+# plot(q)
+# dev.off()
 
 
 #To save a pdf, I always just close any x11 windows I have open and plot it within rstudio.  

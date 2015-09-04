@@ -49,7 +49,7 @@ def main(modelregion, biotype):
 	print "\nSummarizing using agents: \n", agents, "\n..." 
 
 	#define agent aggregation map
-	agent_map = os.path.join(AGGREGATION_PATH, "outputs", modelregion, "change_agent_maps", modelregion+"_agent_aggregation.bsq")
+	agent_map = os.path.join(AGGREGATION_PATH, "outputs", modelregion, "change_agent_maps", modelregion+"_agent_aggregation_forestsonly.bsq")
 
 	#define list of deltaBiomass maps & find # of bands
 	biomass_maps_path = os.path.join(AGGREGATION_PATH, "outputs", modelregion, "biomass_maps")

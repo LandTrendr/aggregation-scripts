@@ -30,16 +30,19 @@ def hdrbandsToDict(hdrfile):
 	dictionary = {}
 	bands = False
 	bandnum = 1
-	for line txt:
-		if line = "band names = {":
-			bands = True 
+	for line in hdr:
+		if "band names" in line:
+			bands = True
+			# continue 
 
 		if bands:
-			year = line.strip(" ")
-			year = year.strip(",")
-			year = year.strip("}")
+			year = line.replace(" ", "")
+			year = year.replace(",", "")
+			year = year.replace("}", "")
+			year = year.replace("\n", "")
+
 			if len(year) == 4:
-				dictionary[year, bandnum]
+				dictionary[year] = bandnum
 				bandnum += 1
 
 	hdr.close()
@@ -68,7 +71,7 @@ def main(modelregion):
 	print "\nSummarizing using agents: \n", agents, "\n..." 
 
 	#define agent aggregation map
-	agent_map = os.path.join(AGGREGATION_PATH, "outputs", modelregion, "change_agent_maps", modelregion+"_agent_aggregation.bsq")
+	agent_map = os.path.join(AGGREGATION_PATH, "outputs", modelregion, "change_agent_maps", modelregion+"_agent_aggregation_forestsonly.bsq")
 
 	#define new structured array to hold summary table
 	years = range(1990,2011)
@@ -81,8 +84,9 @@ def main(modelregion):
 
 	#open agent map
 	ds = gdal.Open(agent_map)
-	bands = hdrbandsToDict(agentmap.replace('bsq', 'hdr'))
+	bands = hdrbandsToDict(agent_map.replace('bsq', 'hdr'))
 	print "\nbands = ", bands
+	print len(bands)
 
 	for y_ind, y in enumerate([str(i) for i in years]): 
 		print "Working on year: ", y, " ..."
