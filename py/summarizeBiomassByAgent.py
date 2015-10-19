@@ -17,7 +17,7 @@ Example: python summarizeBiomassByAgent mr224 jenk
 '''
 import os, sys, glob, gdal
 import numpy as np
-from validation_funs import *
+from lthacks import *
 import intersectMask as im
 
 LAST_COMMIT = getLastCommit(os.path.abspath(__file__))
@@ -29,6 +29,7 @@ def biomass_to_agentband(bandnum):
 	return bandnum + 6
 
 def txtToDict(txtfile):
+	print txtfile
 	txt = open(txtfile, 'r')
 
 	dictionary = {}
@@ -49,7 +50,7 @@ def main(modelregion, biotype):
 	print "\nSummarizing using agents: \n", agents, "\n..." 
 
 	#define agent aggregation map
-	agent_map = os.path.join(AGGREGATION_PATH, "outputs", modelregion, "change_agent_maps", modelregion+"_agent_aggregation_forestsonly.bsq")
+	agent_map = os.path.join(AGGREGATION_PATH, "outputs", modelregion, "change_agent_maps", modelregion+"_agent_aggregation.bsq")
 
 	#define list of deltaBiomass maps & find # of bands
 	biomass_maps_path = os.path.join(AGGREGATION_PATH, "outputs", modelregion, "biomass_maps")
@@ -63,7 +64,7 @@ def main(modelregion, biotype):
 	print "\nwith bands: ", bands
 
 	#loop through years & agents & populate CSV
-	outputfile = '/projectnb/trenders/proj/aggregation/outputs/mr224/summary_tables/{model}_{type}_deltabiomass_summary.csv'.format(model=modelregion, type=biotype)
+	outputfile = '/vol/v1/proj/aggregation/outputs/mr224/summary_tables/{model}_{type}_deltabiomass_summary.csv'.format(model=modelregion, type=biotype)
 	if not os.path.exists(os.path.dirname(outputfile)):
 		os.makedirs(os.path.dirname(outputfile))
 	summary_csv = open(outputfile, 'w')

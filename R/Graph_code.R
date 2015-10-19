@@ -9,9 +9,9 @@ library(ggplot2)
 # data2=read.csv("all.csv", header = T)
 
 #set working directory for new data
-setwd("/projectnb/trenders/proj/aggregation/outputs/mr224/summary_tables/")
+setwd("/vol/v1/proj/aggregation/outputs/mr224/summary_tables/")
 #data=read.csv("mr224_median_biomass_change_by_agent_year_REK.csv", header = T)
-data=read.csv("mr224_mr224_deltabiomass_summary_median_shaped.csv", header = T)
+data=read.csv("mr224_crm_deltabiomass_summary_median_shaped.csv", header = T)
 
 ########################
 #NOT USED#
@@ -81,7 +81,7 @@ print("there")
 bigdf$Agent<-factor(bigdf$Agent, levels=c("Fire","No Agent", "Growth", "Clearcut", "Development", "Partial Harvest",
                                           "Insect/Disease", "Greatest Disturbance", "Road", "False Change", "Unknown Agent", "Water", 
                                           "Debris Flow", "Other", "MPB-29", "MPB-239", "WSB-29", "WSB-239", 
-                                          "Longest Disturbance"))
+                                          "Longest Disturbance", "Second Greatest Disturbance", "Other Disturbance", "Other Growth"))
 
 #have to split into two datasets; one for positive and one for negative values to make bars stack properly
 bigdf1<-subset(bigdf,Biomass >=0)
@@ -97,7 +97,7 @@ bigdf2<-subset(bigdf,Biomass < 0)
 order=cbind(c("Fire","No Agent", "Growth", "Clearcut", "Development", "Partial Harvest",
                    "Insect/Disease", "Greatest Disturbance", "Road", "False Change", "Unknown Agent", "Water", 
                    "Debris Flow", "Other", "MPB-29", "MPB-239", "WSB-29", "WSB-239", 
-                   "Longest Disturbance"))
+                   "Longest Disturbance", "Second Greatest Disturbance", "Other Disturbance", "Other Growth"))
 
 
 ###COLOR SETUP FOR ALL GRAPHS###
@@ -137,20 +137,25 @@ pal[9]=insectcolor  #longest disturbance
 pal[10]=insectcolor  #MPB-239
 pal[11]=insectcolor  #MPB-29
 pal[12]="#FFDDDD"  #No Agent
-pal[13]="#DDDDDD"  #Other
-pal[14]="#5588FF"  #Partial harvest
-pal[15]="#000000"  #Road
-pal[16]="#dddddd"  #Unknown agent
-pal[17]="#000099"  #Water
-pal[18]=insectcolor  #WSB-239
-pal[19]=insectcolor #wsb-29
+pal[13]="#DDDDDD"  #Other Agent
+pal[14]="#6666DD"  #Other disturbance
+pal[15]="#33CC33"  #Other Growth
+
+pal[16]="#5588FF"  #Partial harvest
+pal[17]="#000000"  #Road
+pal[18]="#6666DD"  #Second greatest disturbance
+
+pal[19]="#dddddd"  #Unknown agent
+pal[20]="#000099"  #Water
+pal[21]=insectcolor  #WSB-239
+pal[22]=insectcolor #wsb-29
 
 
 
 
 
 #####ACTUAL PLOTTING CODE!!!#########
-setwd("/projectnb/trenders/proj/aggregation/figs/")
+setwd("/vol/v1/proj/aggregation/figs/")
       p<-ggplot()+
            geom_bar(aes(factor(Year), Biomass/1000000000,fill=Agent, order=Agent),bigdf1, stat = "identity", position = "stack")+
            geom_bar(aes(factor(Year), Biomass/1000000000,fill=Agent, order=Agent),bigdf2, stat = "identity", position = "stack")+
@@ -165,7 +170,7 @@ p<-p+theme(axis.title.x=element_text(size=rel(2)))
 p<-p+theme(axis.title.y=element_text(size=rel(2)))
 p<-p+theme(axis.text.x=element_text(angle=90, size=rel(2), vjust=0.45))
 p
-pdf("mr224_mr224_deltabiomass_totalsum_barchart.pdf")
+pdf("mr224_crm_deltabiomass_totalsum_barchart.pdf")
 plot(p)
 dev.off()
 
@@ -181,7 +186,7 @@ z=ggplot(data=bigdf1,aes(factor(Year),Biomass/1000000,fill=Agent))+
         geom_bar(aes(factor(Year),Biomass/1000000,fill=Agent),bigdf2,stat = "identity",position = "identity")+
         facet_wrap(~Agent)+ylab("Total delta biomass(Mg)")+xlab("Year")+scale_fill_manual(values=pal)
 z
-pdf("mr224_mr224_deltabiomass_totalsum_plotperagent_barchart.pdf")
+pdf("mr224_crm_deltabiomass_totalsum_plotperagent_barchart.pdf")
 plot(z)
 dev.off()
 
@@ -193,7 +198,7 @@ q<-ggplot(list,aes(factor(Year),Year.Sum/1000000))+geom_bar(stat="identity")+xla
          geom_bar(aes(factor(Year),Biomass/1000000,fill=Agent,order=Agent),bigdf,stat = "identity",position = "dodge")+scale_fill_manual(values=pal)+
          geom_abline(intercept=0, slope=0, colour="black", size=1.75)
 q
-pdf("mr224_mr224_deltabiomass_netgainloss.pdf")
+pdf("mr224_crm_deltabiomass_netgainloss.pdf")
 plot(q)
 dev.off()
 

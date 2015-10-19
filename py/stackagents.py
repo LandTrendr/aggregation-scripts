@@ -16,18 +16,19 @@ Usage: python stackagents.py [modelregion] [outputfile]
 Example: python stackagents.py mr224 /projectnb/trenders/proj/aggregation/outputs/mr224/mr224_agent_aggregation.bsq
 '''
 import sys, os, glob, re, shutil, subprocess
+sys.path.insert(0,'/vol/v1/general_files/script_library/mosaic')
 from osgeo import ogr, gdal, gdalconst
 from gdalconst import *
 import numpy as np
 from tempfile import mkstemp
-from validation_funs import *
-import mosaic
+from lthacks import *
+from mosaicDisturbanceMaps_nobuffer import *
 
 LAST_COMMIT = getLastCommit(os.path.abspath(__file__))
 AGGREGATION_SCRIPTS_PATH = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 AGGREGATION_PARAMETERS_PATH = os.path.join(AGGREGATION_SCRIPTS_PATH, "parameters")
 AGGREGATION_PATH = os.path.dirname(AGGREGATION_SCRIPTS_PATH)
-MR224_MASK_PATH = "/projectnb/trenders/proj/cmonster/mr224/mr224_extent_mask.bsq"
+MR224_MASK_PATH = "/vol/v1/proj/cmonster/mr224/mr224_extent_mask.bsq"
 
 def getScenes(modelregion):
 	'''Reads "tsa_list.txt" parameter file for specified modelregion.
@@ -181,6 +182,10 @@ def aggregate(image, agentDict, masterSize, bn):
 			recoval = 51
 			agentArray = np.where(agentArray != 0, recoval, agentArray)
 			
+		elif 'second_greatest_disturbance' in agentbase:
+			sec_val = 41
+			agentArray = np.where(agentArray != 0, sec_val, agentArray)
+			
 		image = np.where(image == 0, agentArray, image)
 	
 	#Test to see if recov layer helps explain some issues...
@@ -245,6 +250,33 @@ def metaDescription_tiles(agents, scene):
 	desc2 = "\n -" + "\n -".join(agents.values()) 
 
 	return desc + desc2
+	
+def createMosaic(files, bands, outputFile):
+	print '\nCreating mosaic'
+	print 'from files' 
+	for f in files:
+		print os.path.basename(f)
+	print 'and bands: {0}'.format(', '.join([str(b) for b in bands]))
+	#print bands
+	#import pdb; pdb.set_trace()
+	run_id = str(random.randint(0, 1000))
+	exec_string = "gdalbuildvrt -srcnodata 0 {0}.vrt ".format(outputFile)
+	for f in files: exec_string += "{0} ".format(f)
+	os.system(exec_string)
+
+	selected_bands = "gdalbuildvrt -separate -srcnodata 0 temp_stack_{0}.vrt ".format(run_id)
+	cleanup = ['temp_stack_{0}.vrt'.format(run_id)]
+	for band in bands:
+		newfile = "ts_{0}_{1}.vrt".format(band, run_id)
+		os.system("gdal_translate -of VRT -b {0} -a_nodata 0 {1}.vrt {2}".format(band, outputFile, newfile))
+		selected_bands += newfile + " "
+		cleanup.append(newfile)
+	os.system(selected_bands)
+	os.system("gdal_translate -of ENVI -a_nodata 0 temp_stack_{1}.vrt {0}.bsq".format(outputFile, run_id))
+	for f in cleanup:
+		try: os.remove(f)
+		except: pass
+	print "Created {0}".format(outputFile)
 
 def main(modelregion, outputfile):
 
@@ -252,6 +284,11 @@ def main(modelregion, outputfile):
 	#get parameters for specified model region
 	agents = getPriorities(modelregion.lower())
 	scenes = getScenes(modelregion.lower())
+	
+	#Open sample iamge to get Band Count
+	sample = gdal.Open(agents[1], GA_ReadOnly)
+	bands = sample.RasterCount
+	sample = None
 
 	if os.path.exists(outputfile):
 		print "\n" + outputfile + " already exists. Replacing ALL outputs."
@@ -271,7 +308,7 @@ def main(modelregion, outputfile):
 		
 		print '\n'
 
-		UAPath = '/projectnb/trenders/scenes/gnn_snapped_cmon_usearea_files/{0}_usearea.bsq'.format(scene)
+		UAPath = '/vol/v1/scenes/gnn_snapped_cmon_usearea_files/{0}_usearea.bsq'.format(scene)
 		
 		outputsdir = os.path.join(AGGREGATION_PATH, "outputs")
 		relpath = os.path.relpath(os.path.abspath(outputfile), AGGREGATION_SCRIPTS_PATH)
@@ -284,11 +321,6 @@ def main(modelregion, outputfile):
 		if (not os.path.exists(outpath)) or replace:
 		
 			UASizeDict, outfileDict = getUASize(UAPath)
-
-			#Open sample iamge to get Band Count
-			sample = gdal.Open(agents[1], GA_ReadOnly)
-			bands = sample.RasterCount
-			sample = None
 
 			for b in range(bands):
 
@@ -305,7 +337,7 @@ def main(modelregion, outputfile):
 			edithdr(outpath, 1984)
 			print 'Created {0}'.format(outpath)
 			if os.path.exists(outpath):
-				tiles.append(outpath)
+				tiles.append(os.path.abspath(outpath))
 
 			#create metadata
 			dataDesc = metaDescription_tiles(agents, scene)
@@ -313,28 +345,28 @@ def main(modelregion, outputfile):
 
 		else:
 			print "\n" + outpath + " already exists. Moving on..."
-			tiles.append(outpath)
+			tiles.append(os.path.abspath(outpath))
 
 	#mosaic tiles
 	mosaicfile = os.path.splitext(os.path.abspath(outputfile))[0] + "_mosaic.bsq"
 	metaDesc_mosaic = "This is a mosaic of the following agent aggregation maps: \n -" + "\n -".join(tiles)
 	if (not os.path.exists(mosaicfile)) or replace:
 		print "\nMosaicking scenes..."
-		mosaic.createMosaicGDALMERGE(tiles, mosaicfile, None, "0")
+		createMosaic(tiles, range(1,bands+1), mosaicfile)
+		createMetadata(sys.argv, mosaicfile, description=metaDesc_mosaic, lastCommit=LAST_COMMIT)
+		edithdr(mosaicfile, 1984)
 	else:
 		print "\n" + mosaicfile + " already exists. Moving on..."
 
 
 	#mask to study region
-	while not os.path.exists(mosaicfile):
-		pass
-	else:
-		createMetadata(sys.argv, mosaicfile, description=metaDesc_mosaic, lastCommit=LAST_COMMIT)
-		edithdr(mosaicfile, 1984)
-		if modelregion.lower() == "mr224":
-			maskcmd = "intersectMask.py " + mosaicfile + " " + MR224_MASK_PATH + " " + os.path.realpath(outputfile) + " --src_band=ALL --meta='This is an agent aggregation map masked by study area'"
-			print "\n" + maskcmd + "\n ...."
-			subprocess.call(maskcmd, shell=True)
+# 	while not os.path.exists(mosaicfile):
+# 		pass
+# 	else:
+	if modelregion.lower() == "mr224":
+		maskcmd = "intersectMask " + mosaicfile + " " + MR224_MASK_PATH + " " + os.path.realpath(outputfile) + " --src_band=ALL --meta='This is an agent aggregation map masked by study area'"
+		print "\n" + maskcmd + "\n ...."
+		subprocess.call(maskcmd, shell=True)
 
 	#wait until processes are finished
 	while not os.path.exists(outputfile):
