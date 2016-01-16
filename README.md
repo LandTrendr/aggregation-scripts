@@ -15,12 +15,18 @@ Change Agent Output Key:
 2: Partial Harvest
 3: Development
 4: Fire
+5: Salvage
 6: Insect/Disease
 7: Road
+8: No Visible Change
 9: False Change
 10: Unknown Agent
 11: Water
+12: Wind
+13: Avalanche: chute
+14: Avalanche: runout
 15: Debris Flow
+16: Landslide
 17: Other
 18: No Name
 21: MPB-29
@@ -29,7 +35,12 @@ Change Agent Output Key:
 26: WSB-239
 30: Longest Disturbance
 40: Greatest Disturbance
+41: Second Greatest Disturbance
+42: Other Disturbance
 51: Growth
+52: Other Growth
+60: Non-forests
+70: No Data
 ```
 
 
