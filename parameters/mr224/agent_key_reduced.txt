@@ -1,0 +1,13 @@
+0: No Agent
+1: Clearcut
+2: Partial Harvest
+3: Development
+4: Fire
+5: Salvage
+6: Insects/Disease
+7: Natural Disturbance
+30: Long Slow Disturbance
+35: Fast Disturbance
+50: Growth
+60: Non-forests
+70: No Data

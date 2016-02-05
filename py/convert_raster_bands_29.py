@@ -1,11 +1,11 @@
 '''Converting a 28 band raster to a 29 band raster for years 1984-2012
-Creted in order to fix agent_aggregation map for MR224.'''
+Created in order to fix agent_aggregation map for MR224.'''
 
 import gdal, os, sys, shutil
 import numpy as np
 from gdalconst import *
 import intersectMask as im
-from validation_funs import *
+from lthacks import *
 from tempfile import mkstemp
 
 CREATED = "08/25/2015" 

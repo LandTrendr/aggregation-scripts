@@ -12,13 +12,14 @@ Outputs:
     -  metadata file
 
 Usage: python deltaBiomass.py [path/to/parameterfile]
-Example: python deltaBiomass.py /projectnb/trenders/proj/aggregation/log/mr224_deltabiomass_params.txt
+Example: python deltaBiomass.py /vol/v1/proj/aggregation/log/mr224_deltabiomass_params.txt
 '''
 import sys, os, glob, re, shutil
 from osgeo import ogr, gdal, gdalconst
 from gdalconst import *
 import numpy as np
 from tempfile import mkstemp
+from lthacks import *
 
 
 def ReadParams(filepath):
@@ -202,7 +203,7 @@ def main(name, regdir, region):
     #region = 'mr224'
     #regdir = '/projectnb/trenders/proj/cmonster/mr224/biomassApril2014/nbr/tc_nbr_k1/bph_ge_3_jenk'
 
-    out = os.path.join('/projectnb/trenders/proj/aggregation/outputs', region.lower(), 'biomass_maps')
+    out = os.path.join('/vol/v1/proj/aggregation/outputs', region.lower(), 'biomass_maps')
     if not os.path.exists(out):
         os.makedirs(out)
     outPath = os.path.join(out, 'biomass_{0}_{1}.bsq'.format(name, region))
@@ -239,6 +240,8 @@ def main(name, regdir, region):
 
     edithdr(outPath, bandNames)
     print 'Created {0}'.format(outPath)
+    
+    createMetadata(sys.argv, outPath)
 
 if __name__ == '__main__':
     #import pdb; pdb.set_trace()

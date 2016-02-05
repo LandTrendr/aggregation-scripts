@@ -1,6 +1,6 @@
 '''
 stackagents.py
-Creates a raster image stack that identifies that dominant 
+Creates a raster image stack that identifies dominant 
 change agents attributed to each pixel for each year.
 
 Authors: Tara Larrue (tlarrue2991@gmail.com) & Jamie Perkins
@@ -29,6 +29,10 @@ AGGREGATION_SCRIPTS_PATH = os.path.dirname(os.path.dirname(os.path.realpath(__fi
 AGGREGATION_PARAMETERS_PATH = os.path.join(AGGREGATION_SCRIPTS_PATH, "parameters")
 AGGREGATION_PATH = os.path.dirname(AGGREGATION_SCRIPTS_PATH)
 MR224_MASK_PATH = "/vol/v1/proj/cmonster/mr224/mr224_extent_mask.bsq"
+MR200_MASK_PATH = "/vol/v1/proj/cmonster/mr200/mr200_mask.bsq"
+FOREST_MASK_PATH = "/vol/v1/general_files/datasets/spatial_data/forestmask/final/forestNonForestmask_WAORCA.bsq"
+NONFOREST_VALUE = 60
+NODATA_VALUE = 70
 
 def getScenes(modelregion):
 	'''Reads "tsa_list.txt" parameter file for specified modelregion.
@@ -177,21 +181,21 @@ def aggregate(image, agentDict, masterSize, bn):
 			else:
 				WSBval = 26
 			agentArray = np.where(agentArray != 0, WSBval, agentArray)
-
-		elif 'recov' in agentbase:
-			recoval = 51
-			agentArray = np.where(agentArray != 0, recoval, agentArray)
 			
-		elif 'second_greatest_disturbance' in agentbase:
-			sec_val = 41
-			agentArray = np.where(agentArray != 0, sec_val, agentArray)
+# 		elif 'recov' in agentbase:
+# 			recoval = 51
+# 			agentArray = np.where(agentArray != 0, recoval, agentArray)
+# 			
+# 		elif 'second_greatest_disturbance' in agentbase:
+# 			sec_val = 41
+# 			agentArray = np.where(agentArray != 0, sec_val, agentArray)
 			
 		image = np.where(image == 0, agentArray, image)
 	
 	#Test to see if recov layer helps explain some issues...
-	recovtest = np.where(image == 51, image, 0)
-	rtest = np.sum(recovtest)
-	if rtest > 0: print "Found {0} 51's!".format(rtest/51)
+# 	recovtest = np.where(image == 51, image, 0)
+# 	rtest = np.sum(recovtest)
+# 	if rtest > 0: print "Found {0} 51's!".format(rtest/51)
 
 	#Close agent file
 	agent = None
@@ -268,11 +272,11 @@ def createMosaic(files, bands, outputFile):
 	cleanup = ['temp_stack_{0}.vrt'.format(run_id)]
 	for band in bands:
 		newfile = "ts_{0}_{1}.vrt".format(band, run_id)
-		os.system("gdal_translate -of VRT -b {0} -a_nodata 0 {1}.vrt {2}".format(band, outputFile, newfile))
+		os.system("gdal_translate -of VRT -b {0} {1}.vrt {2}".format(band, outputFile, newfile))
 		selected_bands += newfile + " "
 		cleanup.append(newfile)
 	os.system(selected_bands)
-	os.system("gdal_translate -of ENVI -a_nodata 0 temp_stack_{1}.vrt {0}.bsq".format(outputFile, run_id))
+	os.system("gdal_translate -of ENVI temp_stack_{1}.vrt {0}.bsq".format(outputFile, run_id))
 	for f in cleanup:
 		try: os.remove(f)
 		except: pass
@@ -281,14 +285,15 @@ def createMosaic(files, bands, outputFile):
 def main(modelregion, outputfile):
 
 	print '\nAggregation Script'
+	
 	#get parameters for specified model region
 	agents = getPriorities(modelregion.lower())
 	scenes = getScenes(modelregion.lower())
 	
-	#Open sample iamge to get Band Count
-	sample = gdal.Open(agents[1], GA_ReadOnly)
+	#Open sample image to get Band Count
+	sample = gdal.Open(agents[5], GA_ReadOnly)
 	bands = sample.RasterCount
-	sample = None
+	del sample
 
 	if os.path.exists(outputfile):
 		print "\n" + outputfile + " already exists. Replacing ALL outputs."
@@ -308,11 +313,15 @@ def main(modelregion, outputfile):
 		
 		print '\n'
 
-		UAPath = '/vol/v1/scenes/gnn_snapped_cmon_usearea_files/{0}_usearea.bsq'.format(scene)
+		#UAPath = '/vol/v1/scenes/gnn_snapped_cmon_usearea_files/{0}_usearea.bsq'.format(scene)
+		#no buffer version below
+		UAPath = '/vol/v1/general_files/datasets/spatial_data/us_contiguous_tsa_masks_nobuffer/us_contiguous_tsa_nobuffer_{0}.bsq'.format(scene)
 		
-		outputsdir = os.path.join(AGGREGATION_PATH, "outputs")
-		relpath = os.path.relpath(os.path.abspath(outputfile), AGGREGATION_SCRIPTS_PATH)
-		outdir = os.path.join(os.path.dirname(os.path.join(outputsdir, relpath)), "agent_tiles")
+		#define and create directory for TSA tiles
+		#outputsdir = os.path.join(AGGREGATION_PATH, "outputs")
+		#relpath = os.path.relpath(os.path.abspath(outputfile), AGGREGATION_SCRIPTS_PATH)
+		#outdir = os.path.join(os.path.dirname(os.path.join(outputsdir, relpath)), "change_agent_maps", "agent_tiles")
+		outdir = os.path.join(os.path.dirname(outputfile), "agent_tiles")
 		outname = '{0}_agent_aggregation.bsq'.format(scene)
 		outpath = os.path.abspath(os.path.join(outdir, outname))
 		if not os.path.exists(outdir):
@@ -348,27 +357,48 @@ def main(modelregion, outputfile):
 			tiles.append(os.path.abspath(outpath))
 
 	#mosaic tiles
-	mosaicfile = os.path.splitext(os.path.abspath(outputfile))[0] + "_mosaic.bsq"
+	mosaicfile = os.path.splitext(os.path.abspath(outputfile))[0] + "_mosaic"
+	mosaicfile_ext = mosaicfile + ".bsq"
 	metaDesc_mosaic = "This is a mosaic of the following agent aggregation maps: \n -" + "\n -".join(tiles)
-	if (not os.path.exists(mosaicfile)) or replace:
-		print "\nMosaicking scenes..."
-		createMosaic(tiles, range(1,bands+1), mosaicfile)
-		createMetadata(sys.argv, mosaicfile, description=metaDesc_mosaic, lastCommit=LAST_COMMIT)
-		edithdr(mosaicfile, 1984)
-	else:
-		print "\n" + mosaicfile + " already exists. Moving on..."
 
+	if (not os.path.exists(mosaicfile_ext)) or replace:
+		print "\nMosaicking scenes..."
+
+		createMosaic(tiles, range(1,bands+1), mosaicfile)
+		createMetadata(sys.argv, mosaicfile_ext, description=metaDesc_mosaic, lastCommit=LAST_COMMIT)
+		edithdr(mosaicfile_ext, 1984)
+	else:
+		print "\n" + mosaicfile_ext + " already exists. Moving on..."
+
+
+	#apply forest mask
+	forestsfile = mosaicfile + "_forestsonly.bsq"
+	maskcmd = "intersectMask " + mosaicfile_ext + " " + FOREST_MASK_PATH + " " + forestsfile + \
+	" --src_band=ALL --out_value={0} --meta='This is an agent aggregation map with forest mask applied.'".format(NONFOREST_VALUE)
+	print "\n" + maskcmd + "\n ...."
+	subprocess.call(maskcmd, shell=True)
+	while not os.path.exists(forestsfile):
+		pass
+	else:
+		edithdr(forestsfile, 1984)	
 
 	#mask to study region
 # 	while not os.path.exists(mosaicfile):
 # 		pass
 # 	else:
 	if modelregion.lower() == "mr224":
-		maskcmd = "intersectMask " + mosaicfile + " " + MR224_MASK_PATH + " " + os.path.realpath(outputfile) + " --src_band=ALL --meta='This is an agent aggregation map masked by study area'"
-		print "\n" + maskcmd + "\n ...."
-		subprocess.call(maskcmd, shell=True)
+		maskpath = MR224_MASK_PATH
+	elif modelregion.lower() == "mr200":
+		maskpath = MR200_MASK_PATH
+	else:
+		sys.exit("Mask definition for " + modelregion + "not defined.")
+		
+	maskcmd = "intersectMask " + forestsfile + " " + maskpath + " " + os.path.realpath(outputfile) + \
+		      " --src_band=ALL --out_value={0} --meta='This is an agent aggregation map with forest mask applied clipped by study area'".format(NODATA_VALUE)
+	print "\n" + maskcmd + "\n ...."
+	subprocess.call(maskcmd, shell=True)
 
-	#wait until processes are finished
+	#wait until processes are finished, then write years to header file
 	while not os.path.exists(outputfile):
 		pass
 	else:

@@ -22,6 +22,8 @@
 26: WSB-239
 30: Long Slow Disturbance
 35: Fast Disturbance
+40: Great Disturbance
+45: Other Disturbance
 50: Growth
 60: Non-forests
 70: No Data

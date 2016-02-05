@@ -25,8 +25,8 @@ def main(inputStack, outputPath):
 		#READ AS ARRAY
 		if b != 1:
 			diff = curr_band_array - last_band_array
-			new_band = (diff < 0) * 42 #other disturbance
-			new_band = new_band + ((diff > 0) * 52) #other growth
+			new_band = (diff < 0) * 50 #other disturbance
+			new_band = new_band + ((diff > 0) * 45) #other growth
 			outbands.append(new_band)
 			last_band_array = curr_band_array
 		else:
@@ -35,18 +35,18 @@ def main(inputStack, outputPath):
 			datatype = curr_band.DataType
 			last_band_array = curr_band_array
 			
-		print np.max(curr_band_array)
-		print curr_band_array.shape
-		print outbands
-		print len(outbands)
+		#print np.max(curr_band_array)
+		#print curr_band_array.shape
+		#print outbands
+		#print len(outbands)
 	
-	print outbands[0]
-	print outbands[0].shape
+	#print outbands[0]
+	#print outbands[0].shape
 	#save raster
 	im.saveArrayAsRaster_multiband(outbands, transform, projection, driver, outputPath, datatype)
 	
 	#save metadata
-	desc = "MR224 difference raster using NBR fitted images used as an agent source map in aggregation workflow."
+	desc = "MR224 difference raster using Band5 fitted images used as an agent source map in aggregation workflow."
 	createMetadata(sys.argv, outputPath, description=desc, lastCommit=SCRIPT_LAST_UPDATED)
 			
 
