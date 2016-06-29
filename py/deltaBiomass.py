@@ -19,7 +19,7 @@ from osgeo import ogr, gdal, gdalconst
 from gdalconst import *
 import numpy as np
 from tempfile import mkstemp
-from lthacks import *
+from lthacks.lthacks import *
 
 
 def ReadParams(filepath):

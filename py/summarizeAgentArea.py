@@ -10,13 +10,12 @@ Inputs:
 Outputs:
 	- csv with amt of hectares affected by agent by year
 
-Usage: python summarizeAgentArea.py [modelregion] [key_filename] [map_filename]
-Example: python summarizeAgentArea.py mr224
+Usage: python summarizeAgentArea.py [modelregion] [key_path] [map_path] [output_path]
 '''
 
 import os, sys, glob, gdal
 import numpy as np
-from lthacks import *
+from lthacks.lthacks import *
 from collections import OrderedDict
 
 AGGREGATION_SCRIPTS_PATH = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -61,18 +60,19 @@ def txtToDict(txtfile):
 
 	return dictionary
 
-def main(modelregion, keyfilename, mapfilename):
+def main(modelregion, keypath, mappath, outputpath):
 
 	modelregion = modelregion.lower()
 
 	#define agent key parameters as dictionary
-	agent_key_path = os.path.join(AGGREGATION_PARAMETERS_PATH, modelregion, keyfilename)
+	#agent_key_path = os.path.join(AGGREGATION_PARAMETERS_PATH, modelregion, keyfilename)
+	agent_key_path=keypath
 	agents = txtToDict(agent_key_path)
 	print "\nSummarizing using agents: \n", agents, "\n..." 
 
 	#define agent aggregation map
-	agent_map = os.path.join(AGGREGATION_PATH, "outputs", modelregion, "change_agent_maps", mapfilename)
-
+	#agent_map = os.path.join(AGGREGATION_PATH, "outputs", modelregion, "change_agent_maps", mapfilename)
+	agent_map = mappath
 	#define new structured array to hold summary table
 	years = range(1990,2011)
 	dtypes = [("AGENT_CODE", 'i4'), ("AGENT_NAME", 'a25')] + [(str(y),'i4') for y in years]
@@ -107,10 +107,11 @@ def main(modelregion, keyfilename, mapfilename):
 			summary[y][a_ind] = hectares
 
 	#define output path & save summary table
-	outputfile = os.path.join(AGGREGATION_PATH, "outputs", modelregion, "summary_tables", "mr224_agent_hectares_summary_{0}.csv".format(keyfilename))
+	#outputfile = os.path.join(AGGREGATION_PATH, "outputs", modelregion, "summary_tables", "mr224_agent_hectares_summary_{0}.csv".format(keyfilename))
+	outputfile = outputpath
 	arrayToCsv(summary, outputfile)
 
 
 if __name__ == '__main__':
 	args = sys.argv
-	sys.exit(main(args[1], args[2], args[3]))
+	sys.exit(main(args[1], args[2], args[3]. args[4]))

@@ -24,7 +24,7 @@ python summarizeBiomassByAgent.py [keyPath] [mapPath] [bioDir] [allometric] [out
 import os, sys, glob, gdal
 from gdalconst import *
 import numpy as np
-from lthacks import *
+from lthacks.lthacks import *
 
 LAST_UPDATED = "02/02/2016"
 
@@ -149,7 +149,8 @@ def main(keyPath, mapPath, bioDir, allometric, outputPath, graphOrderPath=None):
 
 	#write metadata file
 	desc = "This is a summary table of delta biomass data by change agent containing median values of biomass flavors."
-	createMetadata(sys.argv, outputPath_melt, description=desc, lastCommit=LAST_UPDATED)
+	thisfile = os.path.abspath(__file__)
+	createMetadata(sys.argv, outputPath_melt, description=desc, lastCommit=getLastCommit(thisfile))
 
 	print "\n PROCESS COMPLETE!"
 	
