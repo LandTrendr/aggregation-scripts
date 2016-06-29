@@ -7,32 +7,44 @@ Authors: Tara Larrue (tlarrue2991@gmail.com) & Jamie Perkins
 
 Inputs: 
 	- modelregion
+	- modelregion mask path
+	- forest mask path
+	- starting year, assigned to band 1
 	- outputfile path
+
 Outputs:
 	-  ENVI image stack (.bsq file type) w/ 1 band per year identifying dominant change agents
 	-  metadata file
 
-Usage: python stackagents.py [modelregion] [outputfile]
-Example: python stackagents.py mr224 /projectnb/trenders/proj/aggregation/outputs/mr224/mr224_agent_aggregation.bsq
+Usage: python stackagents.py [modelregion] [mr_mask] [forest_mask] [band1_year] [outputfile]
+
+Example: python stackagents.py mr224 /vol/v1/proj/cmonster/mr224/mr224_mask.bsq 
+/vol/v1/general_files/datasets/spatial_data/orcawa_forestnonforestmask.bsq 1984
+/vol/v1/proj/aggregation/outputs/mr224/mr224_agent_aggregation.bsq
 '''
 import sys, os, glob, re, shutil, subprocess
-sys.path.insert(0,'/vol/v1/general_files/script_library/mosaic')
+# sys.path.insert(0,'/vol/v1/general_files/script_library/mosaic/mosaic-scripts')
 from osgeo import ogr, gdal, gdalconst
 from gdalconst import *
 import numpy as np
 from tempfile import mkstemp
 from lthacks.lthacks import *
-from mosaicDisturbanceMaps_nobuffer import *
+import lthacks.intersectMask as imask
+# from mosaicDisturbanceMaps_nobuffer import *
+import random
 
+#global variables
 LAST_COMMIT = getLastCommit(os.path.abspath(__file__))
 AGGREGATION_SCRIPTS_PATH = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 AGGREGATION_PARAMETERS_PATH = os.path.join(AGGREGATION_SCRIPTS_PATH, "parameters")
 AGGREGATION_PATH = os.path.dirname(AGGREGATION_SCRIPTS_PATH)
-MR224_MASK_PATH = "/vol/v1/proj/cmonster/mr224/mr224_extent_mask.bsq"
-MR200_MASK_PATH = "/vol/v1/proj/cmonster/mr200/mr200_mask.bsq"
-FOREST_MASK_PATH = "/vol/v1/general_files/datasets/spatial_data/forestmask/final/forestNonForestmask_WAORCA.bsq"
-NONFOREST_VALUE = 60
-NODATA_VALUE = 70
+NOBUFFER_MASK_TEMPLATE = "/vol/v1/general_files/datasets/spatial_data/us_contiguous_tsa_masks_nobuffer/us_contiguous_tsa_nobuffer_{0}.bsq"
+SEARCHKEYS = {"nodata": ["no", "data"],
+			  "nonforest": ["non", "forest"],
+			  "mpb-29": ["mpb", "29"],
+			  "mpb-239": ["mpb", "239"],
+			  "wsb-29": ["wsb", "29"],
+			  "wsb-239": ["wsb", "239"]}
 
 def getScenes(modelregion):
 	'''Reads "tsa_list.txt" parameter file for specified modelregion.
@@ -44,11 +56,35 @@ def getScenes(modelregion):
 	tsas = []
 	for line in paramdata:
 		line_nospaces = line.strip()
-		tsas.append(sixDigitTSA(line_nospaces))
+		if line_nospaces != '':
+			tsas.append(sixDigitTSA(line_nospaces))
 
 	paramdata.close()
 
 	return tsas
+
+def getKeyDict(modelregion):
+
+	paramfile = os.path.join(AGGREGATION_PARAMETERS_PATH, modelregion, "agent_key.txt")
+	paramdata = open(paramfile, 'r')
+
+	keydict = {}
+
+	for line in paramdata:
+		try:
+			key,desc = line.split(":") 
+			desc=desc.lower().replace(" ", "")
+		except ValueError:
+			sys.exit("ERROR: Check agent_key.txt, make sure each line has format 'key#:description'")
+
+		for name,searchwords in SEARCHKEYS.items():
+			all_in_bools = [word in desc for word in searchwords]
+			if all(all_in_bools):
+				keydict[name] = int(key)
+
+	paramdata.close()
+
+	return keydict
 
 def getPriorities(modelregion):
 	'''Reads "agent_source_priorities.txt" parameter file for specified modelregion. 
@@ -66,55 +102,43 @@ def getPriorities(modelregion):
 
 	return priorities
 
-def getUASize(path):
-	'''Extract bounding info & projection, driver, transform from usearea map'''
+def getUASize(uaPath, allAgentPaths):
+	'''returns a dictionary with output raster parameters, by calculating least common 
+	bounds between all agent sources and TSA use area'''
 
-	#open and get bounding information from the cloudmask
-	UA_image=gdal.Open(path, GA_ReadOnly)
-	if UA_image is None:
-		print("Failed to open "+UA_image)
-		#return 1
-	#Define extent
-	UA_gt=UA_image.GetGeoTransform()
-	ulx=UA_gt[0]
-	uly=UA_gt[3]
+	allmaps = allAgentPaths + [uaPath]	
+	
+	#find single sample map for each insect band
+	for ind,i in enumerate(allmaps):
+		if 'mpb' in i.lower() or 'wsb' in i.lower():
+			searchpath = i.replace("_X_", "_*_")
+			matches = glob.glob(searchpath)
+			sample_map = matches[0]
+			
+			allmaps[ind] = sample_map
+			
+	#find common bounds between use area & all agent source maps
+	common_size, common_transform, projection, driver = imask.findLeastCommonBoundaries(allmaps)
+	cols = int(common_size[0])
+	rows = int(common_size[1])
+	(midx, midy) = imask.transformToCenter(common_transform, cols, rows)
 
-	#the size of the use area file drives everything else
-	masterXsize = UA_image.RasterXSize
-	masterYsize = UA_image.RasterYSize
-
-	#use that to figure out the lower right coordinate
-	lrx=ulx+masterXsize*UA_gt[1]
-	lry=uly+masterYsize*UA_gt[5]
-
-	UASize = {
-
-		'masterXsize': masterXsize,
-		'masterYsize': masterYsize,
-		'ulx': ulx,
-		'uly': uly,
-		'lrx': lrx,
-		'lry': lry
-
+	outsize_dict = {
+		'cols': cols,
+		'rows': rows,
+		'midx': midx,
+		'midy': midy,
+		'transform': common_transform,
+		'projection': projection,
+		'driver': driver
 		}
-	
-	
-	driver = UA_image.GetDriver()
-	projection = UA_image.GetProjection()
 
-	outfileParams = {
+	return outsize_dict	
 
-		'driver': driver,
-		'transform': UA_gt,
-		'projection': projection
-	}
-
-	UA_image = None
-	return UASize, outfileParams
-
-
-def aggregate(image, agentDict, masterSize, bn):
+def aggregate(agentDict, outsize_dict, bn, keydict):
 	'''apply priorities to assign a change agent to each pixel in scene'''
+	
+	image = np.zeros((outsize_dict['rows'], outsize_dict['cols']))
 
 	for agentID in sorted(agentDict.keys()):
 	   
@@ -125,89 +149,47 @@ def aggregate(image, agentDict, masterSize, bn):
 		
 		#Assign different parameter values if the agent is a bug file
 		# if 'WSB' in agentbase or 'MPB' in agentbase or 'recov' in agentbase:
-		if ('WSB' in agentbase) or ('MPB' in agentbase): 
+		if ('wsb' in agentbase.lower()) or ('mpb' in agentbase.lower()):
 			agentPath = agentPath.replace('X', str(bn))
 			fetchband = 1
 		
-	
 		if bn == 1: print 'Working on {0}'.format(os.path.basename(agentPath))
+		
+		#load agent source data within output bounds
 		agent = gdal.Open(agentPath, GA_ReadOnly)
-
-		#get agentfile corners
-		agt = agent.GetGeoTransform()
-		aulx = agt[0]
-		auly = agt[3]
-		alrx = aulx+agent.RasterXSize*agt[1]
-		alry = auly+agent.RasterYSize*agt[5]
-
-		#determine offset
-		diffx = (masterSize['ulx'] - aulx)/agt[1]
-		if diffx < 0:
-			raise NotImplementedError('Agent {0} ULX is within study area mask'.format(os.path.basename(agentPath)))
-
-		diffy = (masterSize['uly'] - auly)/agt[5]
-		if diffy < 0:
-			raise NotImplementedError('Agent {0} ULY is within study area mask'.format(os.path.basename(agentPath)))
-
-		#Round diff values to integer values
-		diffx = int(round(diffx))
-		diffy = int(round(diffy))
-
-		#check to make sure the lower right is not going to be offensive
-		lorXoffset = diffx + masterSize['masterXsize']
-		lorYoffset = diffy + masterSize['masterYsize']
-		if lorXoffset > agent.RasterXSize:
-			print 'Agent {0} LORX is not large enough to accomodate study area'.format(os.path.basename(agentPath))
-			continue
-			#raise NotImplementedError('Agent {0} LORX is not large enough to accomodate study area'.format(os.path.basename(agentPath)))
-		if lorYoffset > agent.RasterYSize:
-			print 'Agent {0} LORY is not large enough to accomodate study area'.format(os.path.basename(agentPath))
-			continue
-			#raise NotImplementedError('Agent {0} LORY is not large enough to accomodate study area'.format(os.path.basename(agentPath)))
-
-		agentArray = agent.GetRasterBand(fetchband).ReadAsArray(diffx, diffy, masterSize['masterXsize'], masterSize['masterYsize'])
+		agent_transform = agent.GetGeoTransform()
+		agentArray = extract_kernel(agent, outsize_dict['midx'], outsize_dict['midy'], 
+		outsize_dict['cols'], outsize_dict['rows'], fetchband, agent_transform)
+		
 		#Where image is 0, assign agent file value, elsewhere keep original value
 		#Also added MPB and WSB values
-		if 'MPB' in agentbase:
+		if 'mpb' in agentbase.lower():
 			if '29' in agentbase:
-				MPBval = 21
+				MPBval = keydict['mpb-29']
 			else:
-				MPBval = 22
+				MPBval = keydict['mpb-239']
 			agentArray = np.where(agentArray != 0, MPBval, agentArray)
 
-		elif 'WSB' in agentbase:
+		elif 'wsb' in agentbase.lower():
 			if '29' in agentbase:
-				WSBval = 25
+				WSBval = keydict['wsb-29']
 			else:
-				WSBval = 26
+				WSBval = keydict['wsb-239']
 			agentArray = np.where(agentArray != 0, WSBval, agentArray)
-			
-# 		elif 'recov' in agentbase:
-# 			recoval = 51
-# 			agentArray = np.where(agentArray != 0, recoval, agentArray)
-# 			
-# 		elif 'second_greatest_disturbance' in agentbase:
-# 			sec_val = 41
-# 			agentArray = np.where(agentArray != 0, sec_val, agentArray)
 			
 		image = np.where(image == 0, agentArray, image)
 	
-	#Test to see if recov layer helps explain some issues...
-# 	recovtest = np.where(image == 51, image, 0)
-# 	rtest = np.sum(recovtest)
-# 	if rtest > 0: print "Found {0} 51's!".format(rtest/51)
-
-	#Close agent file
-	agent = None
+	#clean up
+	del agent, agentArray
 
 	return image
-
-
-def writeFile(path, writeImage, outparams, masterparams, writeband, bandsum):
+	
+def writeFile(path, writeImage, outparams, writeband, bandsum):
 	'''Writes a raster band'''
 	#create outfile on first pass
 	if writeband == 1:
-		outImg = outparams['driver'].Create(path, masterparams['masterXsize'], masterparams['masterYsize'], bandsum, gdalconst.GDT_Int16) #check datatype
+		outImg = outparams['driver'].Create(path, outparams['cols'], 
+		outparams['rows'], bandsum, gdalconst.GDT_Int16)
 		outImg.SetGeoTransform(outparams['transform'])
 		outImg.SetProjection(outparams['projection'])
 	else:
@@ -216,7 +198,6 @@ def writeFile(path, writeImage, outparams, masterparams, writeband, bandsum):
 	outImg.GetRasterBand(writeband).WriteArray(writeImage)
 
 	if writeband == bandsum: outImg = None
-
 
 def edithdr(path, start):
 	'''Assigns years as band names'''
@@ -250,7 +231,8 @@ def edithdr(path, start):
 	shutil.move(tmpPath, hdrPath)
 
 def metaDescription_tiles(agents, scene):
-	desc = "This is an yearly image stack of dominant land cover change agents for TSA {0} aggregated from the following sources:".format(scene)
+	desc = "This is an yearly image stack of dominant land cover change agents for TSA \
+	{0} aggregated from the following sources:".format(scene)
 	desc2 = "\n -" + "\n -".join(agents.values()) 
 
 	return desc + desc2
@@ -280,27 +262,46 @@ def createMosaic(files, bands, outputFile):
 	for f in cleanup:
 		try: os.remove(f)
 		except: pass
+
 	print "Created {0}".format(outputFile)
 
-def main(modelregion, outputfile):
+
+
+def main(modelregion, modelregion_mask, forest_mask, start_year, outputfile):
 
 	print '\nAggregation Script'
+
+	#first, check if outputfile already exists
+	if os.path.exists(outputfile):
+		existsErr = "\n" + outputfile + " already exists. \
+		Please delete file & re-run if you want to replace this output."
+		sys.exit(existsErr)
+
+	#format inputs
+	modelregion = modelregion.lower()
+	notFoundErr = "\nInput path not found : "
+	if not os.path.exists(modelregion_mask):
+		sys.exit(notFoundErr + modelregion_mask)
+	if not os.path.exists(forest_mask):
+		sys.exit(notFoundErr + forest_mask)
+	start_year = int(start_year)
 	
 	#get parameters for specified model region
-	agents = getPriorities(modelregion.lower())
-	scenes = getScenes(modelregion.lower())
+	sources = getPriorities(modelregion) #dictionary
+	scenes = getScenes(modelregion) #list
+	keydict = getKeyDict(modelregion) #dictionary
 	
-	#Open sample image to get Band Count
-	sample = gdal.Open(agents[5], GA_ReadOnly)
-	bands = sample.RasterCount
-	del sample
+	#open sample image to get band count
+	for source in sources.values():
+		if ('insect' not in source.lower()) and ('bug' not in source.lower()):
+			print "\nCounting bands from: ", source
+			break
+	sample = gdal.Open(source, GA_ReadOnly)
+	numbands = sample.RasterCount
+	bands = range(1,numbands+1)
+	del sample, source
 
-	if os.path.exists(outputfile):
-		print "\n" + outputfile + " already exists. Replacing ALL outputs."
-		replace = True
-	else:
-		replace = False
-
+	#accumulate tiles for each TSA
 	tiles = []
 	for scene in scenes:
 
@@ -308,48 +309,44 @@ def main(modelregion, outputfile):
 		print 'For Scene: {0}'.format(scene)
 		print 'From Files:\n'
 		
-		for key, value in sorted(agents.items()):
+		for key, value in sorted(sources.items()):
 			print os.path.basename(value)
 		
 		print '\n'
 
-		#UAPath = '/vol/v1/scenes/gnn_snapped_cmon_usearea_files/{0}_usearea.bsq'.format(scene)
-		#no buffer version below
-		UAPath = '/vol/v1/general_files/datasets/spatial_data/us_contiguous_tsa_masks_nobuffer/us_contiguous_tsa_nobuffer_{0}.bsq'.format(scene)
+		#get no buffer use area mask for TSA
+		UAPath = NOBUFFER_MASK_TEMPLATE.format(scene)
 		
 		#define and create directory for TSA tiles
-		#outputsdir = os.path.join(AGGREGATION_PATH, "outputs")
-		#relpath = os.path.relpath(os.path.abspath(outputfile), AGGREGATION_SCRIPTS_PATH)
-		#outdir = os.path.join(os.path.dirname(os.path.join(outputsdir, relpath)), "change_agent_maps", "agent_tiles")
 		outdir = os.path.join(os.path.dirname(outputfile), "agent_tiles")
 		outname = '{0}_agent_aggregation.bsq'.format(scene)
 		outpath = os.path.abspath(os.path.join(outdir, outname))
 		if not os.path.exists(outdir):
 			os.makedirs(outdir)
 
-		if (not os.path.exists(outpath)) or replace:
+		#create TSA tile if it does not already exist
+		if not os.path.exists(outpath):
 		
-			UASizeDict, outfileDict = getUASize(UAPath)
+			#calculate use area size
+			outsize_dict = getUASize(UAPath, sources.values())
 
-			for b in range(bands):
-
-				band = b + 1
+			#aggregate sources & write out each band
+			for band in bands:
 
 				#Set up aggregate image array
-				agImage = np.zeros((UASizeDict['masterYsize'], UASizeDict['masterXsize']))
-				agImage = aggregate(agImage, agents, UASizeDict, band)
+				agImage = aggregate(sources, outsize_dict, band, keydict)
 
 				print 'Writing band {0}'.format(band)
-				writeFile(outpath, agImage, outfileDict, UASizeDict, band, bands)
+				writeFile(outpath, agImage, outsize_dict, band, numbands)
 			
-			
-			edithdr(outpath, 1984)
+			#edit hdr file with years as band descriptions
+			edithdr(outpath, start_year)
 			print 'Created {0}'.format(outpath)
 			if os.path.exists(outpath):
 				tiles.append(os.path.abspath(outpath))
 
 			#create metadata
-			dataDesc = metaDescription_tiles(agents, scene)
+			dataDesc = metaDescription_tiles(sources, scene)
 			createMetadata(sys.argv, outpath, description=dataDesc, lastCommit=LAST_COMMIT)
 
 		else:
@@ -361,40 +358,31 @@ def main(modelregion, outputfile):
 	mosaicfile_ext = mosaicfile + ".bsq"
 	metaDesc_mosaic = "This is a mosaic of the following agent aggregation maps: \n -" + "\n -".join(tiles)
 
-	if (not os.path.exists(mosaicfile_ext)) or replace:
-		print "\nMosaicking scenes..."
+	if not os.path.exists(mosaicfile_ext):
+		print "\nMosaicing scenes..."
 
-		createMosaic(tiles, range(1,bands+1), mosaicfile)
+		createMosaic(tiles, bands, mosaicfile)
 		createMetadata(sys.argv, mosaicfile_ext, description=metaDesc_mosaic, lastCommit=LAST_COMMIT)
-		edithdr(mosaicfile_ext, 1984)
+		edithdr(mosaicfile_ext, start_year)
 	else:
 		print "\n" + mosaicfile_ext + " already exists. Moving on..."
 
 
 	#apply forest mask
 	forestsfile = mosaicfile + "_forestsonly.bsq"
-	maskcmd = "intersectMask " + mosaicfile_ext + " " + FOREST_MASK_PATH + " " + forestsfile + \
-	" --src_band=ALL --out_value={0} --meta='This is an agent aggregation map with forest mask applied.'".format(NONFOREST_VALUE)
+
+	maskcmd = "intersectMask " + mosaicfile_ext + " " + forest_mask + " " + forestsfile + \
+	" --src_band=ALL --out_value={0} --meta='This is an agent aggregation map with forest mask applied.'".format(str(keydict['nonforest']))
 	print "\n" + maskcmd + "\n ...."
 	subprocess.call(maskcmd, shell=True)
 	while not os.path.exists(forestsfile):
 		pass
 	else:
-		edithdr(forestsfile, 1984)	
+		edithdr(forestsfile, start_year)	
 
 	#mask to study region
-# 	while not os.path.exists(mosaicfile):
-# 		pass
-# 	else:
-	if modelregion.lower() == "mr224":
-		maskpath = MR224_MASK_PATH
-	elif modelregion.lower() == "mr200":
-		maskpath = MR200_MASK_PATH
-	else:
-		sys.exit("Mask definition for " + modelregion + "not defined.")
-		
-	maskcmd = "intersectMask " + forestsfile + " " + maskpath + " " + os.path.realpath(outputfile) + \
-		      " --src_band=ALL --out_value={0} --meta='This is an agent aggregation map with forest mask applied clipped by study area'".format(NODATA_VALUE)
+	maskcmd = "intersectMask " + forestsfile + " " + modelregion_mask + " " + os.path.realpath(outputfile) + \
+		      " --src_band=ALL --out_value={0} --meta='This is an agent aggregation map with forest mask applied clipped by study area'".format(str(keydict['nodata']))
 	print "\n" + maskcmd + "\n ...."
 	subprocess.call(maskcmd, shell=True)
 
@@ -402,10 +390,20 @@ def main(modelregion, outputfile):
 	while not os.path.exists(outputfile):
 		pass
 	else:
-		edithdr(outputfile, 1984)
+		edithdr(outputfile, start_year)
 		print " DONE!"
 
 
 if __name__ == '__main__':
-	args = sys.argv
-	sys.exit(main(args[1], args[2]))
+
+	args = sys.argv[1:]
+
+	if len(args) != 5:
+
+		usageErr = "\nInputs not understood. Usage:\npython stackagents.py \
+		[modelregion] [modelregion_mask] [forest_mask] [band1_year] [outputfile]"
+		sys.exit(usageErr)
+
+	else:
+
+		sys.exit(main(*args))
