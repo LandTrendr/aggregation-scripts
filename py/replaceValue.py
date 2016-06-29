@@ -1,42 +1,42 @@
-'''
-Replace Value.
+#!/usr/bin/env python
 
-inputs: 
-- condition_operator
-- condition_value
-- out_value
-- in_raster_path
-- out_raster_path
-
-outputs:
-- raster
 '''
+Replace Pixel Value.
+
+replacePixelValue.py <input_raster> <output_raster> <operators> <in_values> <out_values>
+replacePixelValue.py -h | --help
+
+Options:
+  -h --help					Show this screen.
+  --multiple_list=<ml>		Path to text file containing condition key (each line - "operator:in_value:out_value").
+  --meta=<meta> 			Additional notes for meta.txt file.
+'''
+
 import sys, os, gdal
 import numpy as np
 from gdalconst import *
-from lthacks import *
-from intersectMask import *
+from lthacks.lthacks import *
+from lthacks.intersectMask import *
+import docopt
 
-LAST_UPDATED = "01/20/2016"
 
-#temporary for loop
-change_dict = {7:3, #road to development
-			   9:0, #false change to no agent
-			   18:0, #N/A to no agent
-			   10:35, #unknown agent to Fast Disturbance
-			   17:35, #other agent to Fast Disturbance
-			   21:6, #MPB-29 to Insects/Disease
-			   22:6, #MPB-239 to Insects/Disease
-			   25:6, #WSB-29 to Insects/Disease
-			   26:6, #WSB-239 to Insects/Disease
-			   11:7, #Water to Natural Disturbance
-			   12:7, #Wind to Natural Disturbance
-			   13:7, #Avalanche-chute to Natural Disturbance
-			   14:7, #Avalanche-runout to Natural Disturbance
-			   15:7, #Debris Flow to Natural Disturbance
-			   16:7} #Landslide to Natural Disturbance
+def readMultList(txtfile):
+	
+	txt = open(txtfile, 'r')
 
-#change_dict = {41:40}
+	replaceList = []
+	for line in txt:
+		comps = line.split(":")
+		comps = [i.strip().lower() for i in comps]
+		
+		if len(comps) != 3:
+			sys.exit("Line not understood: " + line)
+			
+		replaceList.append({'operator': getCondition(comps[0]),
+							'invalue': float(comps[1]),
+							'outvalue': float(comps[2])})
+
+	return replaceList
 
 def getCondition(astring):
 
@@ -61,70 +61,86 @@ def getCondition(astring):
 			return anarray == value
 			
 	else:
-		print sys.exit("Operator input not understood:"+ astring)
+		raise NameError("Operator input not understood:" + astring)
 		
 	return func
 
 
-def main(inputPath, outputPath, conditionOp, conditionVal, outVal):
-
-	#get condition function from operator string
-	condition = getCondition(conditionOp)
-	#conditions = [getCondition(">"), getCondition("<")]
-	#condvals = [0, 0]
-	#outvals = [50, 45]
+def main(input, output, operators, in_values, out_values, meta=None):
+	
+	#get replacement info
+	operators = operators.split(",")
+	in_values = in_values.split(",")
+	out_values = out_values.split(",")
+	
+	replacements = zip(operators, in_values, out_values)
+	replace_list = []
+	for replacement in replacements:
+		try:
+			conditionFunc = getCondition(replacement[0])
+			replaceList.append({'operator': conditionFunc,
+								'invalue': float(replacement[1]),
+								'outvalue': float(replacement[2])})
+		except NameError:
+			sys.exit("ERROR: Input not understood: ", replacement)
 	
 	#open raster & get info
-	ds = gdal.Open(inputPath, GA_ReadOnly)
+	ds = gdal.Open(input, GA_ReadOnly)
 	projection = ds.GetProjection()
 	transform = ds.GetGeoTransform()
 	driver = ds.GetDriver()
-	numBands = ds.RasterCount
+	numbands = ds.RasterCount
+	
+	#initialize output
+	outdata = [0]*numbands
 	
 	#loop thru bands & replace values
-	newData = [0]*numBands
+	for i,item in enumerate(replace_list):
 	
-	#for condition, conditionVal, outVal in zip(conditions, condvals, outvals):
-	for conditionVal, outVal in change_dict.iteritems():
+		print "\nWorking on converting from ", item['invalue'], " to ", item['outvalue'], " ..."
 	
-		print "\nWorking on converting from ", conditionVal, " to ", outVal, " ..."
+		for b,bandnum in enumerate(range(1, numbands+1)):
 	
-		for ind, b in enumerate(range(1, numBands+1)):
-	
-			if conditionVal == 7:	
-				band = ds.GetRasterBand(b)
-				if ind == 0:
+			#determine if this is the first replacement
+			if i == 0:	
+				band = ds.GetRasterBand(bandnum)
+				if b == 0:
 					dt = band.DataType
 		
-				data = band.ReadAsArray()
+				banddata = band.ReadAsArray()
 			
 			else:
-				data = newData[ind]
+				banddata = outdata[bandnum]
 	
-			bools = condition(data, float(conditionVal))
+			#locate pixels to replace
+			bools = item['operator'](banddata, item['invalue'])
 	
-			data[bools] = float(outVal)
+			#replace those pixels with specified out value
+			banddata[bools] = item['outvalue']
 	
-			newData[ind] = data
+			#save band
+			outdata[ind] = banddata
 		
 	#save new arrays as a (multiband) raster
-	saveArrayAsRaster_multiband(newData, transform, projection, driver, outputPath, dt)
+	saveArrayAsRaster_multiband(outdata, transform, projection, driver, output, dt)
 	
-	#save a meta file
-	createMetadata(sys.argv, outputPath, lastCommit=LAST_UPDATED)
+	#save a metadata file
+	fullpath = os.path.abspath(__file__)
+	createMetadata(sys.argv, output, description=meta, lastCommit=getLastCommit(fullpath))
 	
 	
 if __name__ == '__main__':
-	#args = sys.argv
-	#sys.exit(main(args[1], args[2], args[3], args[4], args[5]))
-	inputPath = "/vol/v1/proj/aggregation/outputs/mr224/change_agent_maps/mr224_yearly_change_agents.bsq"
-	outputPath = "/vol/v1/proj/aggregation/outputs/mr224/change_agent_maps/mr224_yearly_change_agents_reduced.bsq"
-	conditionOp = "="
-	conditionVal = ""
-	outVal = ""
-	sys.exit(main(inputPath, outputPath, conditionOp, conditionVal, outVal))
+
+    try:
+        #parse arguments, use file docstring as parameter definition
+        args = docopt.docopt(__doc__)
+
+        #call main function
+        main(args['<input_raster>'], args['<output_raster>'], args['<operators>'], 
+             args['<in_values>'], args['<out_values>']), args['--meta'])
+
+    #handle invalid options
+    except docopt.DocoptExit as e:
+        print e.message
 	
-		
-		
-		
-		
+	

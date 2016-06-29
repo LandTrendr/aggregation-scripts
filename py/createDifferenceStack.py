@@ -1,56 +1,78 @@
 '''
-script to create a difference raster stack
+difference.py
+Script to create a difference raster stack.
+
+Author: Tara Larrue (tlarrue2991@gmail.com)
+
+Inputs:
+- input path
+- output path
+- metadata description (opt.)
+
+Output:
+- raster of difference of input bands
+
+Usage:
+python difference.py {input} {output} [{metadata_description}]
 '''
-SCRIPT_LAST_UPDATED = "09/22/2015"
 
 import sys, gdal
 from gdalconst import *
-import intersectMask as im
-from lthacks import *
+import lthacks.intersectMask as im
+from lthacks.lthacks import *
 
-def main(inputStack, outputPath):
+def main(input, output, metaDesc=None):
+
 	#open raster & get info
-	ds = gdal.Open(inputStack, GA_ReadOnly)
+	ds = gdal.Open(input, GA_ReadOnly)
 	numBands = ds.RasterCount
 	transform = ds.GetGeoTransform()
 	projection = ds.GetProjection()
 	driver = ds.GetDriver()
 	
 	#loop thru bands & calc new bands
+	print "\n{0} total bands.".format(str(numBands))
 	outbands = []
+	
 	for b in range(1,numBands+1):
-		print b
+	
+		print "Working on band {0} of {1}...".format(str(b), str(numBands))
+		
+		#read band
 		curr_band = ds.GetRasterBand(b)
 		curr_band_array = curr_band.ReadAsArray()
-		#READ AS ARRAY
-		if b != 1:
-			diff = curr_band_array - last_band_array
-			new_band = (diff < 0) * 50 #other disturbance
-			new_band = new_band + ((diff > 0) * 45) #other growth
-			outbands.append(new_band)
-			last_band_array = curr_band_array
-		else:
-			new_band = np.zeros(curr_band_array.shape)
-			outbands.append(new_band)
-			datatype = curr_band.DataType
+		
+		if b==1:
+			#add zeros to first band
+			zeros = np.zeros(curr_band_array.shape)
+			outbands.append(zeros)
+			dt = curr_band.DataType
 			last_band_array = curr_band_array
 			
-		#print np.max(curr_band_array)
-		#print curr_band_array.shape
-		#print outbands
-		#print len(outbands)
-	
-	#print outbands[0]
-	#print outbands[0].shape
+		else:
+			#add differences to all other bands
+			diff = curr_band_array - last_band_array
+			outbands.append(diff)
+			last_band_array = curr_band_array
+			
 	#save raster
-	im.saveArrayAsRaster_multiband(outbands, transform, projection, driver, outputPath, datatype)
+	im.saveArrayAsRaster_multiband(outbands, transform, projection, driver, output, dt)
 	
 	#save metadata
-	desc = "MR224 difference raster using Band5 fitted images used as an agent source map in aggregation workflow."
-	createMetadata(sys.argv, outputPath, description=desc, lastCommit=SCRIPT_LAST_UPDATED)
+	createMetadata(sys.argv, output, description=metaDesc, 
+	lastCommit=getLastCommit(__file__))
 			
 
 if __name__ == '__main__':
-	inputStack = sys.argv[1]
-	outputPath = sys.argv[2]
-	main(inputStack, outputPath)
+
+	args = sys.argv[1:]
+	
+	if (len(args) != 2) and (len(args) != 3):
+	
+		errMsg = "\nInputs not understood. Usage:\n\npython difference.py \
+		{input} {output} [{metadata_description}]"
+		sys.exit(errMsg)
+		
+	else:
+	
+		sys.exit(main(*args))

@@ -5,7 +5,7 @@ vertyrs_split.py
 
 import sys, os, gdal
 from gdalconst import *
-from intersectMask import *
+from lthacks.intersectMask import *
 
 YEARS = range(1984,2013)
 

@@ -1,0 +1,27 @@
+0: Undisturbed
+10: Unknown Agent
+11: Other
+20: Clearcut
+21: Partial Harvest
+22: Salvage
+30: Development
+31: Road
+40: Fire
+50: Insect/Disease
+51: MPB-29
+52: MPB-239
+53: WSB-29
+54: WSB-239
+61: Water
+62: Wind
+70: Avalanche-chute
+71: Avalanche-runout
+72: Debris Flow
+73: Landslide
+80: Other Slow Disturbance
+85: Other Fast Disturbance
+90: Recovery
+200: No Visible Change
+201: False Change
+254: Non-forest
+255: No data
